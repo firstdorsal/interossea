@@ -1,0 +1,4 @@
+node_modules
+.env
+generateDoc.sh
+test.js

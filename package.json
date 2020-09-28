@@ -1,0 +1,22 @@
+{
+    "name": "akkount",
+    "version": "1.0.0",
+    "description": "",
+    "main": "index.js",
+    "scripts": {
+        "makedoc": "./generateDoc.sh"
+    },
+    "repository": {
+        "type": "git",
+        "url": "http://git.firstdorsal.eu/firstdorsal/akkount.git"
+    },
+    "homepage": "https://firstdorsal.eu/doc/akkount/",
+    "author": "Paul Colin Hennig",
+    "license": "MIT",
+    "devDependencies": {
+        "dotenv": "^8.2.0",
+        "eslint": "^7.10.0",
+        "jsdoc": "^3.6.6",
+        "jsdoc-to-markdown": "^6.0.1"
+    }
+}
