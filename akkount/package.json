@@ -4,7 +4,8 @@
     "description": "",
     "main": "index.js",
     "scripts": {
-        "makedoc": "./generateDoc.sh"
+        "makedoc": "./generateDoc.sh",
+        "start": "node index.js"
     },
     "repository": {
         "type": "git",
@@ -18,5 +19,11 @@
         "eslint": "^7.10.0",
         "jsdoc": "^3.6.6",
         "jsdoc-to-markdown": "^6.0.1"
+    },
+    "dependencies": {
+        "express": "^4.17.1",
+        "monk": "^7.3.2",
+        "nodemailer": "^6.4.11",
+        "randomstring": "^1.1.5"
     }
 }
