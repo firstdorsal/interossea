@@ -7,20 +7,32 @@ const db = require("monk")(process.env.DB, {
   useUnifiedTopology: true,
 });
 const crypto = require("crypto");
+const sanitize = require("mongo-sanitize");
+const xss = require("xss");
 
-app.listen(process.env.PORT ? process.env.PORT : 80);
+app.listen(process.env.PORT != undefined ? process.env.PORT : 80);
 console.log("server started");
+db.get("login").drop();
 
-app.post("/login", async (req, res) => {
-  if (!req.query || !req.query.email) {
+app.post("/akkount/login", async (req, res) => {
+  if (
+    !req.query ||
+    !req.query.email ||
+    !req.query.email.match(
+      /^(([^<>()\[\]\\.,;:\s@"]{1,64}(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".{1,62}"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]{1,63}\.)+[a-zA-Z]{2,63}))$/
+    )
+  ) {
     res.send("Error");
     return;
   }
+  const email = sanitize(xss(req.query.email));
+  const redirect = sanitize(xss(req.query.from));
+
   const a = await db.get("login").findOne({
-    email: req.query.email,
+    email,
   });
   const token = generateToken(100);
-  const link = `${process.env.WEB_SCHEMA}://${process.env.WEB_URI}/createsession?t=${token}`;
+  const link = `${process.env.WEB_SCHEMA}://${process.env.WEB_URI}/akkount/createsession?t=${token}`;
   if (a) {
     if (a.time + 1000 * 60 * process.env.SLOWDOWN > Date.now()) {
       const wait =
@@ -33,22 +45,24 @@ app.post("/login", async (req, res) => {
     }
     await db.get("login").findOneAndUpdate(
       {
-        email: req.query.email,
+        email,
       },
       {
         $set: {
           time: Date.now(),
           token,
           ip: req.headers["x-forwarded-for"],
+          redirect,
         },
       }
     );
   } else {
     await db.get("login").insert({
-      email: req.query.email,
+      email,
       time: Date.now(),
       token,
       ip: req.headers["x-forwarded-for"],
+      redirect,
     });
   }
   const transporter = nodemailer.createTransport({
@@ -63,11 +77,13 @@ app.post("/login", async (req, res) => {
       pass: process.env.LOGIN_MAIL_PASSWORD,
     },
   });
+
   transporter.sendMail(
     {
       headers: {
         "User-Agent": process.env.MAIL_AGENT,
         "X-Mailer": process.env.MAIL_AGENT,
+        "Reply-To": process.env.REPLY_TO,
       },
       from: `"${process.env.FROM_NAME}" <${process.env.LOGIN_MAIL_USERNAME}>`,
       to: req.query.email,
@@ -86,30 +102,50 @@ app.post("/login", async (req, res) => {
   );
 });
 
-app.get("/createsession", async (req, res) => {
+app.get("/akkount/createsession", async (req, res) => {
+  // send error if token is missing
   if (!req.query || !req.query.t) {
     res.send("Error");
     return;
   }
+  //sanitize the token
+  req.query.t = sanitize(xss(req.query.t));
+
+  //find corresponding email for token
   const a = await db.get("login").findOne({
     token: req.query.t,
   });
-  if (!a || !a.time || a.time + 1000 * 60 * process.env.SLOWDOWN < Date.now()) {
+  //delete token
+  await db.get("login").findOneAndUpdate(
+    {
+      token: req.query.t,
+    },
+    {
+      $set: {
+        token: "",
+      },
+    }
+  );
+  //check if token exists and hasnt expired
+  if (!a) {
     res.send("Invalid Token");
     return;
   }
-  /* IMPLEMENT IN PRODUCTION
-    if (!a.ip ||a.ip != req.headers['x-forwarded-for']) {
-        res.send('Request was sent from a different IP');
-        return;
-    }*/
-  await db.get("login").findOneAndDelete({
-    token: req.query.t,
-  });
+  if (!a.time || a.time + 1000 * 60 * process.env.SLOWDOWN < Date.now()) {
+    res.send("Expired Token");
+    return;
+  }
+  //check if ip requesting the token is the same as ip trying to start a session with it
+  if (!a.ip || a.ip != req.headers["x-forwarded-for"]) {
+    res.send("Request was sent from a different IP");
+    return;
+  }
 
-  const b = await db.get("user").findOne({
+  //try to find user with email
+  let b = await db.get("user").findOne({
     email: a.email,
   });
+  const firstTime = !b;
   if (!b) {
     //create new user if dont exist
     const userId = generateToken(10);
@@ -120,8 +156,11 @@ app.get("/createsession", async (req, res) => {
       time: Date.now(),
       ip: req.headers["x-forwarded-for"],
     });
-    b.userId = userId;
+    b = {
+      userId,
+    };
   }
+  //generate session id
   const newSessionID = generateToken(100);
 
   //append session cookie
@@ -138,9 +177,26 @@ app.get("/createsession", async (req, res) => {
     userId: b.userId,
     time: Date.now(),
     ip: req.headers["x-forwarded-for"],
+    userAgent: req.headers["user-agent"] ? req.headers["user-agent"] : "",
   });
+  /*
+    //if redirect was specified at login redirect to location 
+    */
+  if (firstTime) {
+    res.redirect("/profile");
+    return;
+  } else if (a.redirect != "undefined") {
+    res.redirect("/" + a.redirect);
+    return;
+  }
+  res.redirect("/anmelden");
+});
 
-  res.redirect("/profile");
+app.get("*", (req, res) => {
+  res.send(404);
+});
+app.post("*", (req, res) => {
+  res.send(404);
 });
 
 function generateToken(length) {

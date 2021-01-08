@@ -22,8 +22,10 @@
     },
     "dependencies": {
         "express": "^4.17.1",
+        "mongo-sanitize": "^1.1.0",
         "monk": "^7.3.2",
         "nodemailer": "^6.4.11",
-        "randomstring": "^1.1.5"
+        "randomstring": "^1.1.5",
+        "xss": "^1.0.8"
     }
 }
