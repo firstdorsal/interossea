@@ -1,0 +1,14 @@
+image: node:latest
+
+stages:
+  - docker-build
+
+docker-build:
+  stage: docker-build
+  image: docker:latest
+  before_script:
+    - export CI_REGISTRY=hub.y.gy
+    - docker login -u "docker" -p "$CI_REGISTRY_PASSWORD" https://$CI_REGISTRY
+  script:
+    - docker build --pull -t "$CI_REGISTRY/$CI_PROJECT_NAME" .
+    - docker push "$CI_REGISTRY/$CI_PROJECT_NAME"
