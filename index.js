@@ -34,6 +34,7 @@ app.post("/akkount/login", async (req, res) => {
     email,
   });
   const token = generateToken(100);
+  const preSessionId = generateToken(100);
   const link = `${webSchema}://${process.env.WEB_URI}/akkount/createsession?t=${token}`;
   if (a) {
     if (a.time + 1000 * 60 * process.env.SLOWDOWN > Date.now()) {
@@ -54,6 +55,7 @@ app.post("/akkount/login", async (req, res) => {
           time: Date.now(),
           token,
           ip: req.headers["x-forwarded-for"],
+          preSessionId,
           redirect,
         },
       }
@@ -64,6 +66,7 @@ app.post("/akkount/login", async (req, res) => {
       time: Date.now(),
       token,
       ip: req.headers["x-forwarded-for"],
+      preSessionId,
       redirect,
     });
   }
@@ -99,6 +102,13 @@ app.post("/akkount/login", async (req, res) => {
         console.log(error);
         res.send("Invalid email");
       } else {
+        res.cookie("preSession", preSessionId, {
+          maxAge: 10000000000,
+          path: "/",
+          httpOnly: true,
+          secure: true,
+          sameSite: "Strict",
+        });
         res.send("OK");
       }
     }
@@ -143,7 +153,14 @@ app.get("/akkount/createsession", async (req, res) => {
     res.send("Request was sent from a different IP");
     return;
   }
+  const preSessionId = sanitize(xss(req.cookies.preSessionId));
 
+  if (process.env.DEVELOPMENT === undefined) {
+    //check if browser origin and device is the same
+    if (!a.preSessionId || a.preSessionId != preSessionId) {
+      res.send("Request was sent from a different origin/browser");
+    }
+  }
   //try to find user with email
   let b = await db.get("user").findOne({
     email: a.email,
