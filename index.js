@@ -45,7 +45,7 @@ app.post("/akkount/login", async (req, res) => {
       });
       return;
     }
-    await db.get("login").findOneAndUpdate(
+    db.get("login").findOneAndUpdate(
       {
         email,
       },
@@ -59,7 +59,7 @@ app.post("/akkount/login", async (req, res) => {
       }
     );
   } else {
-    await db.get("login").insert({
+    db.get("login").insert({
       email,
       time: Date.now(),
       token,
@@ -67,6 +67,7 @@ app.post("/akkount/login", async (req, res) => {
       redirect,
     });
   }
+
   const transporter = nodemailer.createTransport({
     host: process.env.MAIL_HOST,
     port: 465,
@@ -195,10 +196,10 @@ app.get("/akkount/createsession", async (req, res) => {
 });
 
 app.get("*", (req, res) => {
-  res.send(404);
+  res.sendStatus(404);
 });
 app.post("*", (req, res) => {
-  res.send(404);
+  res.sendStatus(404);
 });
 
 function generateToken(length) {
