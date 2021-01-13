@@ -87,7 +87,7 @@ app.post("/akkount/login", async (req, res) => {
         "X-Mailer": process.env.MAIL_AGENT,
         "Reply-To": process.env.REPLY_TO,
       },
-      from: `"${process.env.FROM_NAME}" <${process.env.LOGIN_MAIL_USERNAME}>`,
+      from: `"${process.env.FROM_NAME}" <${process.env.FROM_MAIL_ADDRESS}>`,
       to: req.query.email,
       subject: process.env.FROM_NAME,
       text: `Someone requested a link to log into your account. If this was you: Open this link in your browser ${link} Never share this link with anyone!`,
