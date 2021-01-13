@@ -3,7 +3,7 @@ require(`dotenv`).config();
 const express = require("express");
 const app = express();
 const nodemailer = require("nodemailer");
-const db = require("monk")(process.env.DB, {
+const db = require("monk")(process.env.DB_URI, {
   useUnifiedTopology: true,
 });
 const crypto = require("crypto");
@@ -13,6 +13,8 @@ const xss = require("xss");
 app.listen(process.env.PORT != undefined ? process.env.PORT : 80);
 console.log("server started");
 db.get("login").drop();
+const webSchema =
+  process.env.WEB_SCHEMA != undefined ? process.env.WEB_SCHEMA : "https";
 
 app.post("/akkount/login", async (req, res) => {
   if (
@@ -32,7 +34,7 @@ app.post("/akkount/login", async (req, res) => {
     email,
   });
   const token = generateToken(100);
-  const link = `${process.env.WEB_SCHEMA}://${process.env.WEB_URI}/akkount/createsession?t=${token}`;
+  const link = `${webSchema}://${process.env.WEB_URI}/akkount/createsession?t=${token}`;
   if (a) {
     if (a.time + 1000 * 60 * process.env.SLOWDOWN > Date.now()) {
       const wait =
