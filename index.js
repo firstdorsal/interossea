@@ -157,7 +157,7 @@ app.get("/akkount/createsession", async (req, res) => {
     res.send("Request was sent from a different IP");
     return;
   }
-  const preSessionId = sanitize(xss(req.cookies.preSessionId));
+  const preSessionId = sanitize(xss(req.cookies?.preSessionId));
 
   //check if browser origin and device is the same
   if (!a.preSessionId || a.preSessionId != preSessionId) {
