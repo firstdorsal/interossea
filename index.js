@@ -1,7 +1,11 @@
 "use strict";
 require(`dotenv`).config();
 const express = require("express");
+const cookieParser = require("cookie-parser");
+const compression = require("compression");
 const app = express();
+app.use(cookieParser());
+app.use(compression());
 const nodemailer = require("nodemailer");
 const db = require("monk")(process.env.DB_URI, {
   useUnifiedTopology: true,
@@ -155,12 +159,11 @@ app.get("/akkount/createsession", async (req, res) => {
   }
   const preSessionId = sanitize(xss(req.cookies.preSessionId));
 
-  if (process.env.DEVELOPMENT === undefined) {
-    //check if browser origin and device is the same
-    if (!a.preSessionId || a.preSessionId != preSessionId) {
-      res.send("Request was sent from a different origin/browser");
-    }
+  //check if browser origin and device is the same
+  if (!a.preSessionId || a.preSessionId != preSessionId) {
+    res.send("Request was sent from a different origin/browser");
   }
+
   //try to find user with email
   let b = await db.get("user").findOne({
     email: a.email,
