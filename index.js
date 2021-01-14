@@ -107,7 +107,7 @@ app.post("/akkount/login", async (req, res) => {
         res.send("Invalid email");
       } else {
         res.cookie("preSessionId", preSessionId, {
-          maxAge: 10000000000,
+          maxAge: 10000000,
           path: "/",
           httpOnly: true,
           secure: true,
