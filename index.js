@@ -159,7 +159,6 @@ app.get("/akkount/createsession", async (req, res) => {
   }
   const preSessionId = sanitize(xss(req.cookies?.preSessionId));
 
-  console.log(a.preSessionId, preSessionId);
   //check if browser origin and device is the same
   if (!a.preSessionId || a.preSessionId != preSessionId) {
     res.send("Request was sent from a different origin/browser");
