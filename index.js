@@ -159,9 +159,11 @@ app.get("/akkount/createsession", async (req, res) => {
   }
   const preSessionId = sanitize(xss(req.cookies?.preSessionId));
 
+  console.log(a.preSessionId, preSessionId);
   //check if browser origin and device is the same
   if (!a.preSessionId || a.preSessionId != preSessionId) {
     res.send("Request was sent from a different origin/browser");
+    return;
   }
 
   //try to find user with email
@@ -171,7 +173,7 @@ app.get("/akkount/createsession", async (req, res) => {
   const firstTime = !b;
   if (!b) {
     //create new user if dont exist
-    const userId = generateToken(10);
+    const userId = u + generateToken(14);
 
     await db.get("user").insert({
       userId,
@@ -186,7 +188,7 @@ app.get("/akkount/createsession", async (req, res) => {
   //generate session id
   const newSessionID = generateToken(100);
 
-  //append session cookie
+  //append session cookie to response
   res.cookie("session", newSessionID, {
     maxAge: 10000000000,
     path: "/",
