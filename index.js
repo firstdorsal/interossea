@@ -256,7 +256,7 @@ app.get("/akkount/createsession", async (req, res) => {
     res.redirect("/");
 });
 
-router.post("/akkount/2fa/totp/generate", async (req, res) => {
+app.post("/akkount/2fa/totp/generate", async (req, res) => {
     const a = await checkSession(req);
     if (!a) {
         res.send("invalid session");
