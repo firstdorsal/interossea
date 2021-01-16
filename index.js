@@ -301,7 +301,7 @@ app.post("/akkount/2fa/totp/register", async (req, res) => {
         return;
     }
 
-    if (authenticator.generate(a.totpSecret) === req.body.totpToken) {
+    if (authenticator.generate(a.totpSecret) === req.query.totp) {
         await db.collection("user").findOneAndUpdate(
             {
                 _id: a._id
