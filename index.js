@@ -262,6 +262,12 @@ app.post("/akkount/2fa/totp/generate", async (req, res) => {
         res.send({ message: "invalid session", error: true });
         return;
     }
+    if (a.totpActive) {
+        if (!req.query || !req.query.force || req.query.replace !== "true") {
+            res.send({ message: "totp already activated; send the query replace=true to override", error: true });
+            return;
+        }
+    }
     const secret = authenticator.generateSecret();
     const otpauth = authenticator.keyuri(a.userId, process.env.WEB_URI, secret);
     db.collection("user").findOneAndUpdate(
