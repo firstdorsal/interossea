@@ -331,7 +331,6 @@ app.post("/akkount/2fa/totp/register", async (req, res) => {
     }
 });
 
-let a = {};
 app.post("/akkount/2fa/webauthn/register/request", async (req, res) => {
     const a = await checkSession(req);
     if (!a) {
@@ -343,11 +342,11 @@ app.post("/akkount/2fa/webauthn/register/request", async (req, res) => {
         user: { id: a.userId, name: a.userId }
     });
 
-    a = {
+    console.log({
         id: a.userId,
         name: a.userId,
         challenge: challengeResponse.challenge
-    };
+    });
     res.send(challengeResponse);
 });
 
