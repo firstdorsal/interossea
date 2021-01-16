@@ -1,4 +1,4 @@
-version: '3.7'
+version: "3.7"
 
 services:
     db:
@@ -10,8 +10,8 @@ services:
         image: node
         restart: always
         ports:
-            - 127.0.0.1:80:80
+            - 127.0.0.1:3001:80
         working_dir: /home/node/app
-        volumes: 
+        volumes:
             - ./akkount:/home/node/app
         command: "npm start"

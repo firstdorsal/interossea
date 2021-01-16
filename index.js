@@ -3,9 +3,12 @@ require(`dotenv`).config();
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const compression = require("compression");
+const cors = require("cors");
 const app = express();
 app.use(cookieParser());
 app.use(compression());
+app.use(cors());
+
 const nodemailer = require("nodemailer");
 const db = require("monk")(process.env.DB_URI, {
     useUnifiedTopology: true
@@ -14,17 +17,7 @@ const crypto = require("crypto");
 const sanitize = require("mongo-sanitize");
 const xss = require("xss");
 const QRCode = require("qrcode");
-const { Fido2Lib } = require("fido2-library");
-const fido2lib = new Fido2Lib({
-    timeout: 60000,
-    rpId: process.env.WEB_URI,
-    rpName: process.env.DISPLAY_NAME,
-    challengeSize: 128,
-    attestation: "direct",
-    cryptoParams: [-7, -257],
-    authenticatorRequireResidentKey: false,
-    authenticatorUserVerification: "required"
-});
+const { generateRegistrationChallenge, parseRegisterRequest } = require("@webauthn/server");
 
 const { authenticator } = require("otplib");
 
@@ -335,13 +328,23 @@ app.post("/akkount/2fa/totp/register", async (req, res) => {
     }
 });
 
-app.post("/akkount/2fa/webauthn/register/", async (req, res) => {
+app.post("/akkount/2fa/webauthn/register/request", async (req, res) => {
     const a = await checkSession(req);
     if (!a) {
         res.send({ message: "invalid session", error: true });
         return;
     }
-    const registrationOptions = await fido2lib.attestationOptions();
+    const challengeResponse = generateRegistrationChallenge({
+        relyingParty: { name: process.env.DISPLAY_NAME },
+        user: { id: a.userId, name: a.userId }
+    });
+
+    console.log({
+        id: a.userId,
+        name: a.userId,
+        challenge: challengeResponse.challenge
+    });
+    res.send(challengeResponse);
 });
 
 app.get("*", (req, res) => {
