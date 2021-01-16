@@ -30,7 +30,7 @@ app.post("/akkount/login", async (req, res) => {
             /^(([^<>()\[\]\\.,;:\s@"]{1,64}(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".{1,62}"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]{1,63}\.)+[a-zA-Z]{2,63}))$/
         )
     ) {
-        res.send("Error");
+        res.send({ message: `error`, error: true });
         return;
     }
     const email = sanitize(xss(req.query.email));
@@ -46,8 +46,8 @@ app.post("/akkount/login", async (req, res) => {
         if (a.time + 1000 * 60 * process.env.SLOWDOWN > Date.now()) {
             const wait = (a.time + 1000 * 60 * process.env.SLOWDOWN - Date.now()) / 1000;
             res.send({
-                message: `Please wait another ${wait}s before requesting a new login mail.`,
-                seconds: wait
+                message: `Please wait another ${wait}s before requesting a new login mail`,
+                error: true
             });
             return;
         }
@@ -105,7 +105,7 @@ app.post("/akkount/login", async (req, res) => {
         (error, info) => {
             if (error) {
                 console.log(error);
-                res.send("Invalid email");
+                res.send({ message: "Invalid email", error: true });
             } else {
                 res.cookie("preSessionId", preSessionId, {
                     maxAge: 10000000,
@@ -114,7 +114,7 @@ app.post("/akkount/login", async (req, res) => {
                     secure: true,
                     sameSite: "Strict"
                 });
-                res.send("OK");
+                res.send({ message: "Success", error: false });
             }
         }
     );
@@ -123,11 +123,11 @@ app.post("/akkount/login", async (req, res) => {
 app.get("/akkount/createsession", async (req, res) => {
     // send error if token is missing
     if (!req.query) {
-        res.send("no query specified");
+        res.send({ message: "no query specified", error: true });
         return;
     }
     if (!req.query.t) {
-        res.send("no token present");
+        res.send({ message: "no token present", error: true });
         return;
     }
 
@@ -151,31 +151,31 @@ app.get("/akkount/createsession", async (req, res) => {
     );
     //check if token exists and hasnt expired
     if (!a) {
-        res.send("Invalid Token");
+        res.send({ message: "Invalid token", error: true });
         return;
     }
     if (!a.time || a.time + 1000 * 60 * process.env.SLOWDOWN < Date.now()) {
-        res.send("Expired Token");
+        res.send({ message: "Expired token", error: true });
         return;
     }
     //check if ip requesting the token is the same as ip trying to start a session with it
     if (!a.ip || a.ip !== req.headers["x-forwarded-for"]) {
-        res.send("Request was sent from a different IP");
+        res.send({ message: "Request was sent from a different IP", error: true });
         return;
     }
     if (!req.cookies) {
-        res.send("missing cookies");
+        res.send({ message: "missing cookies", error: true });
         return;
     }
     if (!req.cookies.preSessionId) {
-        res.send("missing preSessionId cookie");
+        res.send({ message: "missing preSessionId cookie", error: true });
         return;
     }
     const preSessionId = sanitize(xss(req.cookies.preSessionId));
 
     //check if browser origin and device is the same
     if (!a.preSessionId || a.preSessionId !== preSessionId) {
-        res.send("invalid preSessionId cookie: Request was sent from a different origin/browser");
+        res.send({ message: "invalid preSessionId cookie: Request was sent from a different origin/browser", error: true });
         return;
     }
 
@@ -259,7 +259,7 @@ app.get("/akkount/createsession", async (req, res) => {
 app.post("/akkount/2fa/totp/generate", async (req, res) => {
     const a = await checkSession(req);
     if (!a) {
-        res.send("invalid session");
+        res.send({ message: "invalid session", error: true });
         return;
     }
     const secret = authenticator.generateSecret();
@@ -287,17 +287,17 @@ app.post("/akkount/2fa/totp/register", async (req, res) => {
     const a = await checkSession(req);
 
     if (!a) {
-        res.send("invalid session");
+        res.send({ message: "invalid session", error: true });
         return;
     }
 
     if (!req.query) {
-        res.send("no query specified");
+        res.send({ message: "no query specified", error: true });
         return;
     }
 
     if (!req.query.totp) {
-        res.send("totp token missing");
+        res.send({ message: "totp token missing", error: true });
         return;
     }
 
@@ -312,9 +312,9 @@ app.post("/akkount/2fa/totp/register", async (req, res) => {
                 }
             }
         );
-        res.send("correct token");
+        res.send({ message: "correct token", error: false });
     } else {
-        res.send("invalid token");
+        res.send({ message: "invalid totp token", error: true });
     }
 });
 
