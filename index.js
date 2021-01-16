@@ -14,6 +14,17 @@ const crypto = require("crypto");
 const sanitize = require("mongo-sanitize");
 const xss = require("xss");
 const QRCode = require("qrcode");
+const { Fido2Lib } = require("fido2-library");
+const fido2lib = new Fido2Lib({
+    timeout: 60000,
+    rpId: process.env.WEB_URI,
+    rpName: process.env.DISPLAY_NAME,
+    challengeSize: 128,
+    attestation: "direct",
+    cryptoParams: [-7, -257],
+    authenticatorRequireResidentKey: false,
+    authenticatorUserVerification: "required"
+});
 
 const { authenticator } = require("otplib");
 
@@ -322,6 +333,15 @@ app.post("/akkount/2fa/totp/register", async (req, res) => {
     } else {
         res.send({ message: "invalid totp token", error: true });
     }
+});
+
+app.post("/akkount/2fa/webauthn/register/", async (req, res) => {
+    const a = await checkSession(req);
+    if (!a) {
+        res.send({ message: "invalid session", error: true });
+        return;
+    }
+    const registrationOptions = await fido2lib.attestationOptions();
 });
 
 app.get("*", (req, res) => {
