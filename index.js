@@ -4,10 +4,13 @@ const express = require("express");
 const cookieParser = require("cookie-parser");
 const compression = require("compression");
 const cors = require("cors");
+const bodyParser = require("body-parser");
+
 const app = express();
 app.use(cookieParser());
 app.use(compression());
 app.use(cors());
+app.use(bodyParser());
 
 const nodemailer = require("nodemailer");
 const db = require("monk")(process.env.DB_URI, {
@@ -328,6 +331,7 @@ app.post("/akkount/2fa/totp/register", async (req, res) => {
     }
 });
 
+let a = {};
 app.post("/akkount/2fa/webauthn/register/request", async (req, res) => {
     const a = await checkSession(req);
     if (!a) {
@@ -339,12 +343,20 @@ app.post("/akkount/2fa/webauthn/register/request", async (req, res) => {
         user: { id: a.userId, name: a.userId }
     });
 
-    console.log({
+    a = {
         id: a.userId,
         name: a.userId,
         challenge: challengeResponse.challenge
-    });
+    };
     res.send(challengeResponse);
+});
+
+app.post("/akkount/2fa/webauthn/register/verify", (req, res) => {
+    const { key, challenge } = parseRegisterRequest(req.body);
+
+    console.log(key, challenge);
+
+    return res.send({ loggedIn: true });
 });
 
 app.get("*", (req, res) => {
