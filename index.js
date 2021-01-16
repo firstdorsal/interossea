@@ -5,6 +5,7 @@ const cookieParser = require("cookie-parser");
 const compression = require("compression");
 const cors = require("cors");
 const bodyParser = require("body-parser");
+const cryptoRandomString = require("crypto-random-string");
 
 const app = express();
 app.use(cookieParser());
@@ -379,5 +380,5 @@ const checkSession = async req => {
 };
 
 const generateToken = length => {
-    return crypto.randomBytes(length).toString("base64").replace(/\//g, "_").replace(/\+/g, "-").replace(/\=/g, "");
+    return cryptoRandomString({ length, type: "base64" });
 };
