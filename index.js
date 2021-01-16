@@ -264,7 +264,7 @@ app.post("/akkount/2fa/totp/generate", async (req, res) => {
     }
     if (a.totpActive) {
         if (!req.query || !req.query.force || req.query.replace !== "true") {
-            res.send({ message: "totp already activated; send the query replace=true to override", error: true });
+            res.send({ message: "totp already activated; send the query replace=true to override", error: true, warning: "token is present" });
             return;
         }
     }
