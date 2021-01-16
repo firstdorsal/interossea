@@ -10,7 +10,7 @@ const app = express();
 app.use(cookieParser());
 app.use(compression());
 app.use(cors());
-app.use(bodyParser());
+app.use(bodyParser.json());
 
 const nodemailer = require("nodemailer");
 const db = require("monk")(process.env.DB_URI, {
