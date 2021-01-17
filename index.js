@@ -163,7 +163,7 @@ app.get("/akkount/v1/createsession", async (req, res) => {
     }
 
     //try to find user with email
-    const user = await db.get("user").findOne({
+    let user = await db.get("user").findOne({
         email: a.email
     });
 
@@ -179,7 +179,7 @@ app.get("/akkount/v1/createsession", async (req, res) => {
             time: Date.now(),
             ip: req.headers["x-forwarded-for"]
         });
-        user.userId = userId;
+        user = { userId };
     } else if (user.totpActive || user.webAuthnActive) {
         //check if 2fa is present
 
@@ -230,9 +230,7 @@ app.get("/akkount/v1/createsession", async (req, res) => {
     });
 
     //if redirect was specified at login redirect to location
-    if (firstTime) return res.redirect("/profile");
-    if (a.redirect !== "undefined") return res.redirect("/" + a.redirect);
-    return res.redirect("/");
+    return res.redirect("/2fa");
 });
 
 app.post("/akkount/v1/2fa/totp/generate", async (req, res) => {
