@@ -119,6 +119,20 @@ app.post("/akkount/v1/login", async (req, res) => {
                 secure: true,
                 sameSite: "Strict"
             });
+            res.cookie("session", "", {
+                maxAge: 1,
+                path: "/",
+                httpOnly: true,
+                secure: true,
+                sameSite: "Strict"
+            });
+            res.cookie("firstFactorToken", "", {
+                maxAge: 1,
+                path: "/",
+                httpOnly: true,
+                secure: true,
+                sameSite: "Strict"
+            });
             return res.send({ message: "Success", error: false });
         }
     );
@@ -197,6 +211,20 @@ app.get("/akkount/v1/createsession", async (req, res) => {
         //append firstFactorToken cookie to response
         res.cookie("firstFactorToken", firstFactorToken, {
             maxAge: 10000000,
+            path: "/",
+            httpOnly: true,
+            secure: true,
+            sameSite: "Strict"
+        });
+        res.cookie("session", "", {
+            maxAge: 1,
+            path: "/",
+            httpOnly: true,
+            secure: true,
+            sameSite: "Strict"
+        });
+        res.cookie("preSessionId", "", {
+            maxAge: 1,
             path: "/",
             httpOnly: true,
             secure: true,
@@ -396,7 +424,6 @@ app.post("/akkount/v1/createsession/2fa/webauthn/request", async (req, res) => {
     res.send(newChallenge);
 });
 app.post("/akkount/v1/createsession/2fa/webauthn/verify", async (req, res) => {
-    console.log("1 called");
     if (!req.cookies) return res.send({ message: "missing cookies", error: true });
     if (!req.cookies.firstFactorToken) return res.send({ message: "missing firstFactorToken cookie", error: true });
     if (!req.body) return res.send({ message: "missing body", error: true });
@@ -411,7 +438,6 @@ app.post("/akkount/v1/createsession/2fa/webauthn/verify", async (req, res) => {
     if (!challenge) return res.send({ message: "missing challenge", error: true });
     if (user.webAuthnKey.credID !== keyId) return res.send({ message: "invalid webAuthnKey", error: true });
     if (login.webAuthnLoginChallenge !== challenge) return res.send({ message: "invalid challenge", error: true });
-    console.log(challenge, user.webAuthnKey);
     //solvedChallenge === login.webAuthnLoginChallenge
     if (verifyAuthenticatorAssertion(req.body, user.webAuthnKey)) {
         //generate session id
