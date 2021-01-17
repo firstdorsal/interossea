@@ -398,8 +398,6 @@ app.post("/akkount/v1/createsession/2fa/webauthn/verify", async (req, res) => {
 
     //solvedChallenge === login.webAuthnLoginChallenge
     if (verifyAuthenticatorAssertion(challenge, user.webAuthnKey)) {
-        const user = await db.get("user").findOne({ userId: login.userId });
-
         //generate session id
         const newSessionID = generateToken(100);
 
