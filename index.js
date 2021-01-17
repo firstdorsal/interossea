@@ -20,7 +20,7 @@ const db = require("monk")(process.env.DB_URI, {
 const sanitize = require("mongo-sanitize");
 const xss = require("xss");
 const QRCode = require("qrcode");
-const { generateRegistrationChallenge, parseRegisterRequest, parseLoginRequest, generateLoginChallenge } = require("@webauthn/server");
+const { generateRegistrationChallenge, parseRegisterRequest, parseLoginRequest, generateLoginChallenge, verifyAuthenticatorAssertion } = require("@webauthn/server");
 
 const { authenticator } = require("otplib");
 
@@ -184,7 +184,6 @@ app.get("/akkount/v1/createsession", async (req, res) => {
         //check if 2fa is present
 
         const firstFactorToken = generateToken(100);
-        if (D) console.log("/akkount/v1/createsession", firstFactorToken);
 
         //add firstFactorToken to db
         await db.get("login").insert({
@@ -382,16 +381,7 @@ app.post("/akkount/v1/createsession/2fa/webauthn/request", async (req, res) => {
     if (!user.webAuthnKey) return res.send({ message: "missing public key for this user", error: true });
 
     const newChallenge = generateLoginChallenge(user.webAuthnKey);
-    db.collection("login").findOneAndUpdate(
-        {
-            _id: login._id
-        },
-        {
-            $set: {
-                webAuthnLoginChallenge: newChallenge
-            }
-        }
-    );
+
     res.send(newChallenge);
 });
 app.post("/akkount/v1/createsession/2fa/webauthn/verify", async (req, res) => {
@@ -400,9 +390,14 @@ app.post("/akkount/v1/createsession/2fa/webauthn/verify", async (req, res) => {
     if (!req.body) return res.send({ message: "missing body", error: true });
     const login = await db.get("login").findOne({ firstFactorToken: req.cookies.firstFactorToken });
     if (!login) return res.send({ message: "invalid firstFactorToken", error: true });
+    const user = await db.get("user").findOne({ userId: login.userId });
+    if (!user) return res.send({ message: "user not found", error: true });
+    if (!user.webAuthnKey) return res.send({ message: "missing public key for this user", error: true });
 
-    const solvedChallenge = parseLoginRequest(req.body);
-    if (solvedChallenge === login.webAuthnLoginChallenge) {
+    const { challenge, keyId } = parseLoginRequest(req.body);
+
+    //solvedChallenge === login.webAuthnLoginChallenge
+    if (verifyAuthenticatorAssertion(challenge, user.webAuthnKey)) {
         const user = await db.get("user").findOne({ userId: login.userId });
 
         //generate session id
