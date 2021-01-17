@@ -20,7 +20,7 @@ const db = require("monk")(process.env.DB_URI, {
 const sanitize = require("mongo-sanitize");
 const xss = require("xss");
 const QRCode = require("qrcode");
-const { generateRegistrationChallenge, parseRegisterRequest } = require("@webauthn/server");
+const { generateRegistrationChallenge, parseRegisterRequest, parseLoginRequest, generateLoginChallenge } = require("@webauthn/server");
 
 const { authenticator } = require("otplib");
 
@@ -204,7 +204,8 @@ app.get("/akkount/v1/createsession", async (req, res) => {
             secure: true,
             sameSite: "Strict"
         });
-        if (user.totpActive && user.webAuthnActive) return res.redirect("/login/2fa/");
+
+        if (user.totpActive && user.webAuthnActive) return res.redirect("/login/2fa");
         if (user.totpActive) return res.redirect("/login/2fa/totp");
         return res.redirect("/login/2fa/webauthn");
     }
@@ -286,17 +287,17 @@ app.post("/akkount/v1/2fa/totp/register", async (req, res) => {
 });
 
 app.post("/akkount/v1/2fa/webauthn/register/request", async (req, res) => {
-    const a = await checkSession(req);
-    if (!a) return res.send({ message: "invalid session token", error: true });
+    const user = await checkSession(req);
+    if (!user) return res.send({ message: "invalid session token", error: true });
 
     const challengeResponse = generateRegistrationChallenge({
         relyingParty: { name: process.env.DISPLAY_NAME },
-        user: { id: a.userId, name: a.userId }
+        user: { id: user.userId, name: user.userId }
     });
 
     db.collection("user").findOneAndUpdate(
         {
-            _id: a._id
+            _id: user._id
         },
         {
             $set: {
@@ -309,8 +310,8 @@ app.post("/akkount/v1/2fa/webauthn/register/request", async (req, res) => {
 });
 
 app.post("/akkount/v1/2fa/webauthn/register/verify", async (req, res) => {
-    const a = await checkSession(req);
-    if (!a) return res.send({ message: "invalid session token", error: true });
+    const user = await checkSession(req);
+    if (!user) return res.send({ message: "invalid session token", error: true });
 
     const { key, challenge } = parseRegisterRequest(req.body);
     db.collection("user").findOne({ webAuthnRegisterChallenge: challenge });
@@ -318,7 +319,7 @@ app.post("/akkount/v1/2fa/webauthn/register/verify", async (req, res) => {
     if (db.collection.length) {
         db.collection("user").findOneAndUpdate(
             {
-                _id: a._id
+                _id: user._id
             },
             {
                 $set: {
@@ -338,10 +339,10 @@ app.post("/akkount/v1/createsession/2fa/totp", async (req, res) => {
     if (!req.query) return res.send({ message: "missing query", error: true });
     if (!req.query.totp) return res.send({ message: "missing totp query", error: true });
 
-    const u = await db.get("login").findOne({ firstFactorToken: req.cookies.firstFactorToken });
-    if (!u.length) return res.send({ message: "invalid firstFactorToken", error: true });
+    const login = await db.get("login").findOne({ firstFactorToken: req.cookies.firstFactorToken });
+    if (!login.length) return res.send({ message: "invalid firstFactorToken", error: true });
 
-    const a = await db.get("user").findOne({ userId: u.userId });
+    const user = await db.get("user").findOne({ userId: login.userId });
     if (authenticator.generate(a.totpSecret) === req.query.totp) {
         //generate session id
         const newSessionID = generateToken(100);
@@ -349,7 +350,7 @@ app.post("/akkount/v1/createsession/2fa/totp", async (req, res) => {
         //save session cookie to db
         await db.get("session").insert({
             session: newSessionID,
-            userId: u.userId,
+            userId: user.userId,
             time: Date.now(),
             ip: req.headers["x-forwarded-for"],
             userAgent: req.headers["user-agent"] ? req.headers["user-agent"] : ""
@@ -365,10 +366,72 @@ app.post("/akkount/v1/createsession/2fa/totp", async (req, res) => {
         });
 
         //if redirect was specified at login redirect to location
-        if (u.redirect !== "undefined") return res.redirect("/" + u.redirect);
+        if (login.redirect !== "undefined") return res.redirect("/" + login.redirect);
         return res.redirect("/");
     }
     return res.send({ message: "invalid totp", error: true });
+});
+
+app.post("/akkount/v1/createsession/2fa/webauthn/request", async (req, res) => {
+    if (!req.cookies) return res.send({ message: "missing cookies", error: true });
+    if (!req.cookies.firstFactorToken) return res.send({ message: "missing firstFactorToken cookie", error: true });
+    const login = await db.get("login").findOne({ firstFactorToken: req.cookies.firstFactorToken });
+
+    if (!login.length) return res.send({ message: "invalid firstFactorToken", error: true });
+    const user = await db.get("user").findOne({ userId: login.userId });
+    if (!user.length) return res.send({ message: "user not found", error: true });
+    if (!user.key) return res.send({ message: "missing public key for this user", error: true });
+
+    const newChallenge = generateLoginChallenge(user.key);
+    db.collection("login").findOneAndUpdate(
+        {
+            _id: login._id
+        },
+        {
+            $set: {
+                webAuthnLoginChallenge: newChallenge
+            }
+        }
+    );
+    res.send(newChallenge);
+});
+app.post("/akkount/v1/createsession/2fa/webauthn/verify", async (req, res) => {
+    if (!req.cookies) return res.send({ message: "missing cookies", error: true });
+    if (!req.cookies.firstFactorToken) return res.send({ message: "missing firstFactorToken cookie", error: true });
+    if (!req.body) return res.send({ message: "missing body", error: true });
+    const login = await db.get("login").findOne({ firstFactorToken: req.cookies.firstFactorToken });
+    if (!login.length) return res.send({ message: "invalid firstFactorToken", error: true });
+
+    const solvedChallenge = parseLoginRequest(req.body);
+    if (solvedChallenge === login.webAuthnLoginChallenge) {
+        const user = await db.get("user").findOne({ userId: login.userId });
+
+        //generate session id
+        const newSessionID = generateToken(100);
+
+        //save session cookie to db
+        await db.get("session").insert({
+            session: newSessionID,
+            userId: user.userId,
+            time: Date.now(),
+            ip: req.headers["x-forwarded-for"],
+            userAgent: req.headers["user-agent"] ? req.headers["user-agent"] : ""
+        });
+
+        //append session cookie to response
+        res.cookie("session", newSessionID, {
+            maxAge: 10000000000,
+            path: "/",
+            httpOnly: true,
+            secure: true,
+            sameSite: "Strict"
+        });
+
+        //if redirect was specified at login redirect to location
+        if (login.redirect !== "undefined") return res.redirect("/" + login.redirect);
+        return res.redirect("/");
+    }
+    return res.send({ message: "WebAuthn challenge failed", error: true });
 });
 
 app.get("*", (req, res) => {
