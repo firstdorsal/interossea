@@ -391,10 +391,11 @@ app.post("/akkount/v1/createsession/2fa/webauthn/request", async (req, res) => {
             }
         }
     );
-    console.log(newChallenge.challenge);
+    console.log(newChallenge);
     res.send(newChallenge);
 });
 app.post("/akkount/v1/createsession/2fa/webauthn/verify", async (req, res) => {
+    console.log("1 called");
     if (!req.cookies) return res.send({ message: "missing cookies", error: true });
     if (!req.cookies.firstFactorToken) return res.send({ message: "missing firstFactorToken cookie", error: true });
     if (!req.body) return res.send({ message: "missing body", error: true });
@@ -434,8 +435,7 @@ app.post("/akkount/v1/createsession/2fa/webauthn/verify", async (req, res) => {
         });
 
         //if redirect was specified at login redirect to location
-        if (login.redirect !== "undefined") return res.redirect("/" + login.redirect);
-        return res.redirect("/");
+        return res.send({ message: "success", error: false });
     }
     return res.send({ message: "WebAuthn challenge failed", error: true });
 });
