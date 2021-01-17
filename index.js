@@ -50,7 +50,6 @@ app.post("/akkount/v1/login", async (req, res) => {
     const token = generateToken(100);
     const preSessionId = generateToken(100);
     const link = `${webSchema}://${process.env.WEB_URI}/akkount/v1/createsession?t=${token}`;
-    if (D) console.log(token, link);
     if (a) {
         if (a.time + 1000 * 60 * process.env.SLOWDOWN > Date.now()) {
             const wait = (a.time + 1000 * 60 * process.env.SLOWDOWN - Date.now()) / 1000;
@@ -138,7 +137,6 @@ app.get("/akkount/v1/createsession", async (req, res) => {
     const a = await db.get("login").findOne({
         token: req.query.t
     });
-    if (D) console.log(a);
     //delete login
     await db.get("login").findOneAndDelete({
         token: req.query.t
@@ -188,6 +186,8 @@ app.get("/akkount/v1/createsession", async (req, res) => {
         //check if 2fa is present
 
         const firstFactorToken = generateToken(100);
+        if (D) console.log("/akkount/v1/createsession", firstFactorToken);
+
         //add firstFactorToken to db
         await db.get("login").insert({
             firstFactorToken,
@@ -375,6 +375,7 @@ app.post("/akkount/v1/createsession/2fa/totp", async (req, res) => {
 app.post("/akkount/v1/createsession/2fa/webauthn/request", async (req, res) => {
     if (!req.cookies) return res.send({ message: "missing cookies", error: true });
     if (!req.cookies.firstFactorToken) return res.send({ message: "missing firstFactorToken cookie", error: true });
+    if (D) console.log("/akkount/v1/createsession/2fa/webauthn/request", req.cookies.firstFactorToken);
     const login = await db.get("login").findOne({ firstFactorToken: req.cookies.firstFactorToken });
 
     if (!login.length) return res.send({ message: "invalid firstFactorToken", error: true });
