@@ -360,7 +360,8 @@ app.post("/akkount/2fa/webauthn/register/request", async (req, res) => {
 app.post("/akkount/2fa/webauthn/register/verify", async (req, res) => {
     const a = await checkSession(req);
     if (!a) {
-        return res.send({ message: "invalid session", error: true });
+        res.send({ message: "invalid session", error: true });
+        return;
     }
 
     const { key, challenge } = parseRegisterRequest(req.body);
@@ -377,10 +378,11 @@ app.post("/akkount/2fa/webauthn/register/verify", async (req, res) => {
                 }
             }
         );
-
-        return res.send({ message: "Success", error: false });
+        res.send({ message: "Success", error: false });
+        return;
     }
-    return res.send({ message: "Challenge failed", error: true });
+    res.send({ message: "Challenge failed", error: true });
+    return;
 });
 
 app.get("*", (req, res) => {
