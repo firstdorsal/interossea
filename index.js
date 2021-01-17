@@ -392,5 +392,5 @@ const checkSession = async req => {
 };
 
 const generateToken = length => {
-    return cryptoRandomString({ length, type: "base64" });
+    return cryptoRandomString({ length, type: "base64" }).replaceAll("+", "-").replaceAll("/", "_");
 };
