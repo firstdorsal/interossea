@@ -28,7 +28,7 @@ app.listen(process.env.PORT !== undefined ? process.env.PORT : 80);
 console.log("server started");
 if (process.env.DEVELOPMENT) db.get("login").drop();
 const webSchema = process.env.WEB_SCHEMA != undefined ? process.env.WEB_SCHEMA : "https";
-console.log(process.env.DEBUG);
+console.log("debug mode set to " + !!process.env.DEBUG);
 const D = process.env.DEBUG;
 
 app.post("/akkount/v1/login", async (req, res) => {
@@ -50,6 +50,7 @@ app.post("/akkount/v1/login", async (req, res) => {
     const token = generateToken(100);
     const preSessionId = generateToken(100);
     const link = `${webSchema}://${process.env.WEB_URI}/akkount/v1/createsession?t=${token}`;
+    if (D) console.log(token, link);
     if (a) {
         if (a.time + 1000 * 60 * process.env.SLOWDOWN > Date.now()) {
             const wait = (a.time + 1000 * 60 * process.env.SLOWDOWN - Date.now()) / 1000;
