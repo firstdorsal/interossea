@@ -377,14 +377,10 @@ app.post("/akkount/v1/createsession/2fa/webauthn/request", async (req, res) => {
     if (!req.cookies) return res.send({ message: "missing cookies", error: true });
     if (!req.cookies.firstFactorToken) return res.send({ message: "missing firstFactorToken cookie", error: true });
     const fft = sanitize(xss(req.cookies.firstFactorToken));
-    console.log("1", fft.replace(" ", "§"));
 
     const login = await db.get("login").findOne({ firstFactorToken: fft });
-    console.log("2", login);
-    const test = await db.get("login").find({});
-    console.log("3", test);
 
-    if (!login || !login.length) return res.send({ message: "invalid firstFactorToken", error: true });
+    if (!login) return res.send({ message: "invalid firstFactorToken", error: true });
     const user = await db.get("user").findOne({ userId: login.userId });
     if (!user.length) return res.send({ message: "user not found", error: true });
     if (!user.key) return res.send({ message: "missing public key for this user", error: true });
