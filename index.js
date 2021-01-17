@@ -341,7 +341,7 @@ app.post("/akkount/v1/createsession/2fa/totp", async (req, res) => {
     if (!req.query.totp) return res.send({ message: "missing totp query", error: true });
 
     const login = await db.get("login").findOne({ firstFactorToken: req.cookies.firstFactorToken });
-    if (!login.length) return res.send({ message: "invalid firstFactorToken", error: true });
+    if (!login) return res.send({ message: "invalid firstFactorToken", error: true });
 
     const user = await db.get("user").findOne({ userId: login.userId });
     if (authenticator.generate(user.totpSecret) === req.query.totp) {
@@ -382,7 +382,7 @@ app.post("/akkount/v1/createsession/2fa/webauthn/request", async (req, res) => {
 
     if (!login) return res.send({ message: "invalid firstFactorToken", error: true });
     const user = await db.get("user").findOne({ userId: login.userId });
-    if (!user.length) return res.send({ message: "user not found", error: true });
+    if (!user) return res.send({ message: "user not found", error: true });
     if (!user.key) return res.send({ message: "missing public key for this user", error: true });
 
     const newChallenge = generateLoginChallenge(user.key);
@@ -403,7 +403,7 @@ app.post("/akkount/v1/createsession/2fa/webauthn/verify", async (req, res) => {
     if (!req.cookies.firstFactorToken) return res.send({ message: "missing firstFactorToken cookie", error: true });
     if (!req.body) return res.send({ message: "missing body", error: true });
     const login = await db.get("login").findOne({ firstFactorToken: req.cookies.firstFactorToken });
-    if (!login.length) return res.send({ message: "invalid firstFactorToken", error: true });
+    if (!login) return res.send({ message: "invalid firstFactorToken", error: true });
 
     const solvedChallenge = parseLoginRequest(req.body);
     if (solvedChallenge === login.webAuthnLoginChallenge) {
