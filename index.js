@@ -335,8 +335,7 @@ app.post("/akkount/v1/2fa/totp/register", async (req, res) => {
 app.post("/akkount/v1/2fa/webauthn/register/request", async (req, res) => {
     const a = await checkSession(req);
     if (!a) {
-        res.send({ message: "invalid session", error: true });
-        return;
+        return res.send({ message: "invalid session", error: true });
     }
     const challengeResponse = generateRegistrationChallenge({
         relyingParty: { name: process.env.DISPLAY_NAME },
@@ -354,7 +353,7 @@ app.post("/akkount/v1/2fa/webauthn/register/request", async (req, res) => {
         }
     );
 
-    res.send(challengeResponse);
+    return res.send(challengeResponse);
 });
 
 app.post("/akkount/v1/2fa/webauthn/register/verify", async (req, res) => {
