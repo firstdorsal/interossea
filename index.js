@@ -379,9 +379,9 @@ app.post("/akkount/v1/createsession/2fa/webauthn/request", async (req, res) => {
     if (!login) return res.send({ message: "invalid firstFactorToken", error: true });
     const user = await db.get("user").findOne({ userId: login.userId });
     if (!user) return res.send({ message: "user not found", error: true });
-    if (!user.key) return res.send({ message: "missing public key for this user", error: true });
+    if (!user.webAuthnKey) return res.send({ message: "missing public key for this user", error: true });
 
-    const newChallenge = generateLoginChallenge(user.key);
+    const newChallenge = generateLoginChallenge(user.webAuthnKey);
     db.collection("login").findOneAndUpdate(
         {
             _id: login._id
