@@ -17,7 +17,6 @@ const nodemailer = require("nodemailer");
 const db = require("monk")(process.env.DB_URI, {
     useUnifiedTopology: true
 });
-const crypto = require("crypto");
 const sanitize = require("mongo-sanitize");
 const xss = require("xss");
 const QRCode = require("qrcode");
@@ -136,17 +135,10 @@ app.get("/akkount/v1/createsession", async (req, res) => {
     const a = await db.get("login").findOne({
         token: req.query.t
     });
-    //delete token
-    await db.get("login").findOneAndUpdate(
-        {
-            token: req.query.t
-        },
-        {
-            $set: {
-                token: ""
-            }
-        }
-    );
+    //delete login
+    await db.get("login").findOneAndDelete({
+        token: req.query.t
+    });
     //check if token exists and hasnt expired
     if (!a) return res.send({ message: "Invalid token", error: true });
 
@@ -188,7 +180,7 @@ app.get("/akkount/v1/createsession", async (req, res) => {
         user = {
             userId
         };
-    } else if (user.totpActive) {
+    } else if (user.totpActive || user.webAuthnActive) {
         //check if 2fa is present
 
         const firstFactorToken = generateToken(100);
@@ -208,7 +200,9 @@ app.get("/akkount/v1/createsession", async (req, res) => {
             secure: true,
             sameSite: "Strict"
         });
-        if (user.totpActive) return res.redirect("/2fa/totp");
+        if (user.totpActive && user.webAuthnActive) return res.redirect("/login/2fa/");
+        if (user.totpActive) return res.redirect("/login/2fa/totp");
+        return res.redirect("/login/2fa/webauthn");
     }
     //generate session id
     const newSessionID = generateToken(100);
@@ -268,13 +262,9 @@ app.post("/akkount/v1/2fa/totp/generate", async (req, res) => {
 
 app.post("/akkount/v1/2fa/totp/register", async (req, res) => {
     const a = await checkSession(req);
-
     if (!a) return res.send({ message: "invalid session", error: true });
-
     if (!req.query) return res.send({ message: "no query specified", error: true });
-
     if (!req.query.totp) return res.send({ message: "totp token missing", error: true });
-
     if (authenticator.generate(a.totpSecret) === req.query.totp) {
         await db.collection("user").findOneAndUpdate(
             {
@@ -328,13 +318,53 @@ app.post("/akkount/v1/2fa/webauthn/register/verify", async (req, res) => {
             },
             {
                 $set: {
-                    webAuthnKey: key
+                    webAuthnKey: key,
+                    webAuthnActive: true
                 }
             }
         );
         return res.send({ message: "Success", error: false });
     }
     return res.send({ message: "Challenge failed", error: true });
+});
+
+app.post("/akkount/v1/createsession/2fa/totp", async (req, res) => {
+    if (!req.cookies) return res.send({ message: "missing cookies", error: true });
+    if (!req.cookies.firstFactorToken) return res.send({ message: "missing firstFactorToken cookie", error: true });
+    if (!req.query) return res.send({ message: "missing query", error: true });
+    if (!req.query.totp) return res.send({ message: "missing totp query", error: true });
+
+    const u = await db.get("login").findOne({ firstFactorToken: req.cookies.firstFactorToken });
+    if (!u.length) return res.send({ message: "invalid firstFactorToken", error: true });
+
+    const a = await db.get("user").findOne({ userId: u.userId });
+    if (authenticator.generate(a.totpSecret) === req.query.totp) {
+        //generate session id
+        const newSessionID = generateToken(100);
+
+        //save session cookie to db
+        await db.get("session").insert({
+            session: newSessionID,
+            userId: u.userId,
+            time: Date.now(),
+            ip: req.headers["x-forwarded-for"],
+            userAgent: req.headers["user-agent"] ? req.headers["user-agent"] : ""
+        });
+
+        //append session cookie to response
+        res.cookie("session", newSessionID, {
+            maxAge: 10000000000,
+            path: "/",
+            httpOnly: true,
+            secure: true,
+            sameSite: "Strict"
+        });
+
+        //if redirect was specified at login redirect to location
+        if (u.redirect !== "undefined") return res.redirect("/" + u.redirect);
+        return res.redirect("/");
+    }
+    return res.send({ message: "invalid totp", error: true });
 });
 
 app.get("*", (req, res) => {
