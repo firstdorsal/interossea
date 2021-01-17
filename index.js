@@ -380,6 +380,7 @@ app.post("/akkount/2fa/webauthn/register/verify", async (req, res) => {
 
         return res.send({ message: "Success", error: false });
     }
+    return res.send({ message: "Challenge failed", error: true });
 });
 
 app.get("*", (req, res) => {
