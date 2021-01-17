@@ -28,7 +28,9 @@ app.listen(process.env.PORT !== undefined ? process.env.PORT : 80);
 console.log("server started");
 if (process.env.DEVELOPMENT) db.get("login").drop();
 const webSchema = process.env.WEB_SCHEMA != undefined ? process.env.WEB_SCHEMA : "https";
-const D = process.env.DEBUG !== undefined ? true : false;
+console.log(process.env.DEBUG);
+const D = process.env.DEBUG;
+
 app.post("/akkount/v1/login", async (req, res) => {
     if (
         !req.query ||
