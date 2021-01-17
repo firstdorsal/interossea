@@ -30,7 +30,7 @@ console.log("server started");
 db.get("login").drop();
 const webSchema = process.env.WEB_SCHEMA != undefined ? process.env.WEB_SCHEMA : "https";
 
-app.post("/akkount/login", async (req, res) => {
+app.post("/akkount/v1/login", async (req, res) => {
     if (
         !req.query ||
         !req.query.email ||
@@ -49,7 +49,7 @@ app.post("/akkount/login", async (req, res) => {
     });
     const token = generateToken(100);
     const preSessionId = generateToken(100);
-    const link = `${webSchema}://${process.env.WEB_URI}/akkount/createsession?t=${token}`;
+    const link = `${webSchema}://${process.env.WEB_URI}/akkount/v1/createsession?t=${token}`;
     if (a) {
         if (a.time + 1000 * 60 * process.env.SLOWDOWN > Date.now()) {
             const wait = (a.time + 1000 * 60 * process.env.SLOWDOWN - Date.now()) / 1000;
@@ -128,7 +128,7 @@ app.post("/akkount/login", async (req, res) => {
     );
 });
 
-app.get("/akkount/createsession", async (req, res) => {
+app.get("/akkount/v1/createsession", async (req, res) => {
     // send error if token is missing
     if (!req.query) {
         res.send({ message: "no query specified", error: true });
@@ -264,7 +264,7 @@ app.get("/akkount/createsession", async (req, res) => {
     res.redirect("/");
 });
 
-app.post("/akkount/2fa/totp/generate", async (req, res) => {
+app.post("/akkount/v1/2fa/totp/generate", async (req, res) => {
     const a = await checkSession(req);
     if (!a) {
         res.send({ message: "invalid session", error: true });
@@ -297,7 +297,7 @@ app.post("/akkount/2fa/totp/generate", async (req, res) => {
     });
 });
 
-app.post("/akkount/2fa/totp/register", async (req, res) => {
+app.post("/akkount/v1/2fa/totp/register", async (req, res) => {
     const a = await checkSession(req);
 
     if (!a) {
@@ -332,7 +332,7 @@ app.post("/akkount/2fa/totp/register", async (req, res) => {
     }
 });
 
-app.post("/akkount/2fa/webauthn/register/request", async (req, res) => {
+app.post("/akkount/v1/2fa/webauthn/register/request", async (req, res) => {
     const a = await checkSession(req);
     if (!a) {
         res.send({ message: "invalid session", error: true });
@@ -357,7 +357,7 @@ app.post("/akkount/2fa/webauthn/register/request", async (req, res) => {
     res.send(challengeResponse);
 });
 
-app.post("/akkount/2fa/webauthn/register/verify", async (req, res) => {
+app.post("/akkount/v1/2fa/webauthn/register/verify", async (req, res) => {
     const a = await checkSession(req);
     if (!a) {
         res.send({ message: "invalid session", error: true });
