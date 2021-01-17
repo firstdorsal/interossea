@@ -38,8 +38,7 @@ app.post("/akkount/v1/login", async (req, res) => {
             /^(([^<>()\[\]\\.,;:\s@"]{1,64}(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".{1,62}"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]{1,63}\.)+[a-zA-Z]{2,63}))$/
         )
     ) {
-        res.send({ message: `error`, error: true });
-        return;
+        return res.send({ message: `error`, error: true });
     }
     const email = sanitize(xss(req.query.email));
     const redirect = sanitize(xss(req.query.from));
@@ -53,11 +52,10 @@ app.post("/akkount/v1/login", async (req, res) => {
     if (a) {
         if (a.time + 1000 * 60 * process.env.SLOWDOWN > Date.now()) {
             const wait = (a.time + 1000 * 60 * process.env.SLOWDOWN - Date.now()) / 1000;
-            res.send({
+            return res.send({
                 message: `Please wait another ${wait}s before requesting a new login mail`,
                 error: true
             });
-            return;
         }
         db.get("login").findOneAndUpdate(
             {
@@ -111,33 +109,25 @@ app.post("/akkount/v1/login", async (req, res) => {
             html: `Someone requested a link to log into your account. If this was you: Click on the link to <a href="${link}"><b>Login</b></a> <p style="color:red;"> <b>Never share this link with anyone!</b></p>`
         },
         (error, info) => {
-            if (error) {
-                console.log(error);
-                res.send({ message: "Invalid email", error: true });
-            } else {
-                res.cookie("preSessionId", preSessionId, {
-                    maxAge: 10000000,
-                    path: "/",
-                    httpOnly: true,
-                    secure: true,
-                    sameSite: "Strict"
-                });
-                res.send({ message: "Success", error: false });
-            }
+            if (error) return res.send({ message: "Invalid email", error: true });
+
+            res.cookie("preSessionId", preSessionId, {
+                maxAge: 10000000,
+                path: "/",
+                httpOnly: true,
+                secure: true,
+                sameSite: "Strict"
+            });
+            return res.send({ message: "Success", error: false });
         }
     );
 });
 
 app.get("/akkount/v1/createsession", async (req, res) => {
     // send error if token is missing
-    if (!req.query) {
-        res.send({ message: "no query specified", error: true });
-        return;
-    }
-    if (!req.query.t) {
-        res.send({ message: "no token present", error: true });
-        return;
-    }
+    if (!req.query) return res.send({ message: "no query specified", error: true });
+
+    if (!req.query.t) return res.send({ message: "no token present", error: true });
 
     //sanitize the token
     req.query.t = sanitize(xss(req.query.t));
@@ -158,33 +148,24 @@ app.get("/akkount/v1/createsession", async (req, res) => {
         }
     );
     //check if token exists and hasnt expired
-    if (!a) {
-        res.send({ message: "Invalid token", error: true });
-        return;
-    }
+    if (!a) return res.send({ message: "Invalid token", error: true });
+
     if (!a.time || a.time + 1000 * 60 * process.env.SLOWDOWN < Date.now()) {
-        res.send({ message: "Expired token", error: true });
-        return;
+        return res.send({ message: "Expired token", error: true });
     }
     //check if ip requesting the token is the same as ip trying to start a session with it
     if (!a.ip || a.ip !== req.headers["x-forwarded-for"]) {
-        res.send({ message: "Request was sent from a different IP", error: true });
-        return;
+        return res.send({ message: "Request was sent from a different IP", error: true });
     }
-    if (!req.cookies) {
-        res.send({ message: "missing cookies", error: true });
-        return;
-    }
-    if (!req.cookies.preSessionId) {
-        res.send({ message: "missing preSessionId cookie", error: true });
-        return;
-    }
+    if (!req.cookies) return res.send({ message: "missing cookies", error: true });
+
+    if (!req.cookies.preSessionId) return res.send({ message: "missing preSessionId cookie", error: true });
+
     const preSessionId = sanitize(xss(req.cookies.preSessionId));
 
     //check if browser origin and device is the same
     if (!a.preSessionId || a.preSessionId !== preSessionId) {
-        res.send({ message: "invalid preSessionId cookie: Request was sent from a different origin/browser", error: true });
-        return;
+        return res.send({ message: "invalid preSessionId cookie: Request was sent from a different origin/browser", error: true });
     }
 
     //try to find user with email
@@ -227,10 +208,7 @@ app.get("/akkount/v1/createsession", async (req, res) => {
             secure: true,
             sameSite: "Strict"
         });
-        if (user.totpActive) {
-            res.redirect("/2fa/totp");
-            return;
-        }
+        if (user.totpActive) return res.redirect("/2fa/totp");
     }
     //generate session id
     const newSessionID = generateToken(100);
@@ -254,26 +232,17 @@ app.get("/akkount/v1/createsession", async (req, res) => {
     });
 
     //if redirect was specified at login redirect to location
-    if (firstTime) {
-        res.redirect("/profile");
-        return;
-    } else if (a.redirect !== "undefined") {
-        res.redirect("/" + a.redirect);
-        return;
-    }
-    res.redirect("/");
+    if (firstTime) return res.redirect("/profile");
+    if (a.redirect !== "undefined") return res.redirect("/" + a.redirect);
+    return res.redirect("/");
 });
 
 app.post("/akkount/v1/2fa/totp/generate", async (req, res) => {
     const a = await checkSession(req);
-    if (!a) {
-        res.send({ message: "invalid session", error: true });
-        return;
-    }
+    if (!a) return res.send({ message: "invalid session", error: true });
     if (a.totpActive) {
         if (!req.query || !req.query.replace || req.query.replace !== "true") {
-            res.send({ message: "totp already activated; send the query replace=true to override", error: true, warning: "token is present" });
-            return;
+            return res.send({ message: "totp already activated; send the query replace=true to override", error: true, warning: "token is present" });
         }
     }
     const secret = authenticator.generateSecret();
@@ -300,20 +269,11 @@ app.post("/akkount/v1/2fa/totp/generate", async (req, res) => {
 app.post("/akkount/v1/2fa/totp/register", async (req, res) => {
     const a = await checkSession(req);
 
-    if (!a) {
-        res.send({ message: "invalid session", error: true });
-        return;
-    }
+    if (!a) return res.send({ message: "invalid session", error: true });
 
-    if (!req.query) {
-        res.send({ message: "no query specified", error: true });
-        return;
-    }
+    if (!req.query) return res.send({ message: "no query specified", error: true });
 
-    if (!req.query.totp) {
-        res.send({ message: "totp token missing", error: true });
-        return;
-    }
+    if (!req.query.totp) return res.send({ message: "totp token missing", error: true });
 
     if (authenticator.generate(a.totpSecret) === req.query.totp) {
         await db.collection("user").findOneAndUpdate(
@@ -326,17 +286,15 @@ app.post("/akkount/v1/2fa/totp/register", async (req, res) => {
                 }
             }
         );
-        res.send({ message: "correct token", error: false });
-    } else {
-        res.send({ message: "invalid totp token", error: true });
+        return res.send({ message: "correct token", error: false });
     }
+    return res.send({ message: "invalid totp token", error: true });
 });
 
 app.post("/akkount/v1/2fa/webauthn/register/request", async (req, res) => {
     const a = await checkSession(req);
-    if (!a) {
-        return res.send({ message: "invalid session", error: true });
-    }
+    if (!a) return res.send({ message: "invalid session", error: true });
+
     const challengeResponse = generateRegistrationChallenge({
         relyingParty: { name: process.env.DISPLAY_NAME },
         user: { id: a.userId, name: a.userId }
