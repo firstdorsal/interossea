@@ -377,9 +377,11 @@ app.post("/akkount/v1/createsession/2fa/totp", async (req, res) => {
 app.post("/akkount/v1/createsession/2fa/webauthn/request", async (req, res) => {
     if (!req.cookies) return res.send({ message: "missing cookies", error: true });
     if (!req.cookies.firstFactorToken) return res.send({ message: "missing firstFactorToken cookie", error: true });
-    if (D) console.log("/akkount/v1/createsession/2fa/webauthn/request", req.cookies.firstFactorToken);
     const fft = sanitize(xss(req.cookies.firstFactorToken));
+    if (D) console.log("/akkount/v1/createsession/2fa/webauthn/request", fft);
+
     const login = await db.get("login").findOne({ firstFactorToken: fft });
+    if (D) console.log("/akkount/v1/createsession/2fa/webauthn/request", login);
 
     if (!login || !login.length) return res.send({ message: "invalid firstFactorToken", error: true });
     const user = await db.get("user").findOne({ userId: login.userId });
