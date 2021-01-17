@@ -179,9 +179,7 @@ app.get("/akkount/v1/createsession", async (req, res) => {
             time: Date.now(),
             ip: req.headers["x-forwarded-for"]
         });
-        user = {
-            userId
-        };
+        user.userId = userId;
     } else if (user.totpActive || user.webAuthnActive) {
         //check if 2fa is present
 
