@@ -196,6 +196,8 @@ app.get("/akkount/v1/createsession", async (req, res) => {
             ip: req.headers["x-forwarded-for"],
             userAgent: req.headers["user-agent"] ? req.headers["user-agent"] : ""
         });
+        const debug = await db.get("login").findOne({ firstFactorToken });
+        console.log(debug);
         //append firstFactorToken cookie to response
         res.cookie("firstFactorToken", firstFactorToken, {
             maxAge: 10000000,
@@ -376,9 +378,10 @@ app.post("/akkount/v1/createsession/2fa/webauthn/request", async (req, res) => {
     if (!req.cookies) return res.send({ message: "missing cookies", error: true });
     if (!req.cookies.firstFactorToken) return res.send({ message: "missing firstFactorToken cookie", error: true });
     if (D) console.log("/akkount/v1/createsession/2fa/webauthn/request", req.cookies.firstFactorToken);
-    const login = await db.get("login").findOne({ firstFactorToken: req.cookies.firstFactorToken });
+    const fft = sanitize(xss(req.cookies.firstFactorToken));
+    const login = await db.get("login").findOne({ firstFactorToken: fft });
 
-    if (!login.length) return res.send({ message: "invalid firstFactorToken", error: true });
+    if (!login || !login.length) return res.send({ message: "invalid firstFactorToken", error: true });
     const user = await db.get("user").findOne({ userId: login.userId });
     if (!user.length) return res.send({ message: "user not found", error: true });
     if (!user.key) return res.send({ message: "missing public key for this user", error: true });
