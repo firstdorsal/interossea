@@ -343,20 +343,43 @@ app.post("/akkount/2fa/webauthn/register/request", async (req, res) => {
         user: { id: a.userId, name: a.userId }
     });
 
-    console.log({
-        id: a.userId,
-        name: a.userId,
-        challenge: challengeResponse.challenge
-    });
+    db.collection("user").findOneAndUpdate(
+        {
+            _id: a._id
+        },
+        {
+            $set: {
+                webAuthnRegisterChallenge: challengeResponse.challenge
+            }
+        }
+    );
+
     res.send(challengeResponse);
 });
 
-app.post("/akkount/2fa/webauthn/register/verify", (req, res) => {
+app.post("/akkount/2fa/webauthn/register/verify", async (req, res) => {
+    const a = await checkSession(req);
+    if (!a) {
+        return res.send({ message: "invalid session", error: true });
+    }
+
     const { key, challenge } = parseRegisterRequest(req.body);
+    db.collection("user").findOne({ webAuthnRegisterChallenge: challenge });
 
-    console.log(key, challenge);
+    if (db.collection.length) {
+        db.collection("user").findOneAndUpdate(
+            {
+                _id: a._id
+            },
+            {
+                $set: {
+                    webAuthnKey: key
+                }
+            }
+        );
 
-    return res.send({ loggedIn: true });
+        return res.send({ message: "Success", error: false });
+    }
 });
 
 app.get("*", (req, res) => {
