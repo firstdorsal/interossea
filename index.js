@@ -28,7 +28,7 @@ app.listen(process.env.PORT !== undefined ? process.env.PORT : 80);
 console.log("server started");
 if (process.env.DEVELOPMENT) db.get("login").drop();
 const webSchema = process.env.WEB_SCHEMA != undefined ? process.env.WEB_SCHEMA : "https";
-
+const D = process.env.DEBUG !== undefined ? process.env.DEBUG : false;
 app.post("/akkount/v1/login", async (req, res) => {
     if (
         !req.query ||
@@ -135,6 +135,7 @@ app.get("/akkount/v1/createsession", async (req, res) => {
     const a = await db.get("login").findOne({
         token: req.query.t
     });
+    if (D) console.log(a);
     //delete login
     await db.get("login").findOneAndDelete({
         token: req.query.t
