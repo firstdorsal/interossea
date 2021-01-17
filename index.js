@@ -126,7 +126,7 @@ app.get("/akkount/v1/createsession", async (req, res) => {
     // send error if token is missing
     if (!req.query) return res.send({ message: "no query specified", error: true });
 
-    if (!req.query.t) return res.send({ message: "no token present", error: true });
+    if (!req.query.t) return res.send({ message: "no login token present", error: true });
 
     //sanitize the token
     req.query.t = sanitize(xss(req.query.t));
@@ -135,16 +135,15 @@ app.get("/akkount/v1/createsession", async (req, res) => {
     const a = await db.get("login").findOne({
         token: req.query.t
     });
-    if (D) console.log(a);
     //delete login
     await db.get("login").findOneAndDelete({
         token: req.query.t
     });
     //check if token exists and hasnt expired
-    if (!a) return res.send({ message: "Invalid token", error: true });
+    if (!a) return res.send({ message: "Invalid login token", error: true });
 
     if (!a.time || a.time + 1000 * 60 * process.env.SLOWDOWN < Date.now()) {
-        return res.send({ message: "Expired token", error: true });
+        return res.send({ message: "Expired login token", error: true });
     }
     //check if ip requesting the token is the same as ip trying to start a session with it
     if (!a.ip || a.ip !== req.headers["x-forwarded-for"]) {
@@ -263,7 +262,7 @@ app.post("/akkount/v1/2fa/totp/generate", async (req, res) => {
 
 app.post("/akkount/v1/2fa/totp/register", async (req, res) => {
     const a = await checkSession(req);
-    if (!a) return res.send({ message: "invalid session", error: true });
+    if (!a) return res.send({ message: "invalid session token", error: true });
     if (!req.query) return res.send({ message: "no query specified", error: true });
     if (!req.query.totp) return res.send({ message: "totp token missing", error: true });
     if (authenticator.generate(a.totpSecret) === req.query.totp) {
@@ -277,14 +276,14 @@ app.post("/akkount/v1/2fa/totp/register", async (req, res) => {
                 }
             }
         );
-        return res.send({ message: "correct token", error: false });
+        return res.send({ message: "correct totp token", error: false });
     }
     return res.send({ message: "invalid totp token", error: true });
 });
 
 app.post("/akkount/v1/2fa/webauthn/register/request", async (req, res) => {
     const a = await checkSession(req);
-    if (!a) return res.send({ message: "invalid session", error: true });
+    if (!a) return res.send({ message: "invalid session token", error: true });
 
     const challengeResponse = generateRegistrationChallenge({
         relyingParty: { name: process.env.DISPLAY_NAME },
@@ -307,7 +306,7 @@ app.post("/akkount/v1/2fa/webauthn/register/request", async (req, res) => {
 
 app.post("/akkount/v1/2fa/webauthn/register/verify", async (req, res) => {
     const a = await checkSession(req);
-    if (!a) return res.send({ message: "invalid session", error: true });
+    if (!a) return res.send({ message: "invalid session token", error: true });
 
     const { key, challenge } = parseRegisterRequest(req.body);
     db.collection("user").findOne({ webAuthnRegisterChallenge: challenge });
@@ -326,7 +325,7 @@ app.post("/akkount/v1/2fa/webauthn/register/verify", async (req, res) => {
         );
         return res.send({ message: "Success", error: false });
     }
-    return res.send({ message: "Challenge failed", error: true });
+    return res.send({ message: "WebAuthn challenge failed", error: true });
 });
 
 app.post("/akkount/v1/createsession/2fa/totp", async (req, res) => {
