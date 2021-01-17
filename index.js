@@ -381,7 +381,17 @@ app.post("/akkount/v1/createsession/2fa/webauthn/request", async (req, res) => {
     if (!user.webAuthnKey) return res.send({ message: "missing public key for this user", error: true });
 
     const newChallenge = generateLoginChallenge(user.webAuthnKey);
-
+    db.collection("login").findOneAndUpdate(
+        {
+            _id: login._id
+        },
+        {
+            $set: {
+                webAuthnLoginChallenge: newChallenge.challenge
+            }
+        }
+    );
+    console.log(newChallenge.challenge);
     res.send(newChallenge);
 });
 app.post("/akkount/v1/createsession/2fa/webauthn/verify", async (req, res) => {
@@ -396,9 +406,12 @@ app.post("/akkount/v1/createsession/2fa/webauthn/verify", async (req, res) => {
 
     const { challenge, keyId } = parseLoginRequest(req.body);
 
+    if (!challenge) return res.send({ message: "missing challenge", error: true });
+    if (user.webAuthnKey.credId !== keyId) return res.send({ message: "invalid key", error: true });
+    if (login.webAuthnLoginChallenge !== challenge) return res.send({ message: "invalid challenge", error: true });
     console.log(challenge, user.webAuthnKey);
     //solvedChallenge === login.webAuthnLoginChallenge
-    if (verifyAuthenticatorAssertion(challenge, user.webAuthnKey)) {
+    if (verifyAuthenticatorAssertion(req.body, user.webAuthnKey)) {
         //generate session id
         const newSessionID = generateToken(100);
 
