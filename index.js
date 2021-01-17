@@ -344,7 +344,7 @@ app.post("/akkount/v1/createsession/2fa/totp", async (req, res) => {
     if (!login.length) return res.send({ message: "invalid firstFactorToken", error: true });
 
     const user = await db.get("user").findOne({ userId: login.userId });
-    if (authenticator.generate(a.totpSecret) === req.query.totp) {
+    if (authenticator.generate(user.totpSecret) === req.query.totp) {
         //generate session id
         const newSessionID = generateToken(100);
 
@@ -377,8 +377,12 @@ app.post("/akkount/v1/createsession/2fa/webauthn/request", async (req, res) => {
     if (!req.cookies) return res.send({ message: "missing cookies", error: true });
     if (!req.cookies.firstFactorToken) return res.send({ message: "missing firstFactorToken cookie", error: true });
     const fft = sanitize(xss(req.cookies.firstFactorToken));
-    const login = await db.get("login").findOne({ firstFactorToken: fft });
+    console.log("1", fft.replaceAll(" ", "§"));
 
+    const login = await db.get("login").findOne({ firstFactorToken: fft });
+    console.log("2", login);
+    const test = await db.get("login").find({});
+    console.log("3", test);
     if (!login || !login.length) return res.send({ message: "invalid firstFactorToken", error: true });
     const user = await db.get("user").findOne({ userId: login.userId });
     if (!user.length) return res.send({ message: "user not found", error: true });
