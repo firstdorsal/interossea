@@ -349,7 +349,8 @@ app.post("/akkount/v1/2fa/webauthn/register/verify", async (req, res) => {
             {
                 $set: {
                     webAuthnKey: key,
-                    webAuthnActive: true
+                    webAuthnActive: true,
+                    webAuthnRegisterChallenge: false
                 }
             }
         );
