@@ -139,6 +139,21 @@ app.post("/akkount/v1/login", async (req, res) => {
 });
 
 app.get("/akkount/v1/createsession", async (req, res) => {
+    res.cookie("session", "", {
+        maxAge: 1,
+        path: "/",
+        httpOnly: true,
+        secure: true,
+        sameSite: "Strict"
+    });
+    res.cookie("preSessionId", "", {
+        maxAge: 1,
+        path: "/",
+        httpOnly: true,
+        secure: true,
+        sameSite: "Strict"
+    });
+
     // send error if token is missing
     if (!req.query) return res.send({ message: "no query specified", error: true });
 
@@ -211,20 +226,6 @@ app.get("/akkount/v1/createsession", async (req, res) => {
         //append firstFactorToken cookie to response
         res.cookie("firstFactorToken", firstFactorToken, {
             maxAge: 10000000,
-            path: "/",
-            httpOnly: true,
-            secure: true,
-            sameSite: "Strict"
-        });
-        res.cookie("session", "", {
-            maxAge: 1,
-            path: "/",
-            httpOnly: true,
-            secure: true,
-            sameSite: "Strict"
-        });
-        res.cookie("preSessionId", "", {
-            maxAge: 1,
             path: "/",
             httpOnly: true,
             secure: true,
@@ -388,10 +389,16 @@ app.post("/akkount/v1/createsession/2fa/totp", async (req, res) => {
             secure: true,
             sameSite: "Strict"
         });
+        res.cookie("firstFactorToken", "", {
+            maxAge: 1,
+            path: "/",
+            httpOnly: true,
+            secure: true,
+            sameSite: "Strict"
+        });
 
         //if redirect was specified at login redirect to location
-        if (login.redirect !== "undefined") return res.redirect("/" + login.redirect);
-        return res.redirect("/");
+        return res.send({ message: "invalid totp", error: true });
     }
     return res.send({ message: "invalid totp", error: true });
 });
@@ -420,7 +427,6 @@ app.post("/akkount/v1/createsession/2fa/webauthn/request", async (req, res) => {
         }
     );
     newChallenge.userVerification = "preferred";
-    console.log(newChallenge);
     res.send(newChallenge);
 });
 app.post("/akkount/v1/createsession/2fa/webauthn/verify", async (req, res) => {
@@ -455,6 +461,13 @@ app.post("/akkount/v1/createsession/2fa/webauthn/verify", async (req, res) => {
         //append session cookie to response
         res.cookie("session", newSessionID, {
             maxAge: 10000000000,
+            path: "/",
+            httpOnly: true,
+            secure: true,
+            sameSite: "Strict"
+        });
+        res.cookie("firstFactorToken", "", {
+            maxAge: 1,
             path: "/",
             httpOnly: true,
             secure: true,
