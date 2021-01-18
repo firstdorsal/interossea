@@ -19,7 +19,7 @@ const db = require("monk")(process.env.DB_URI, {
 });
 const sanitize = require("mongo-sanitize");
 const xss = require("xss");
-const QRCode = require("qrcode");
+const qrcode = require("qrcode");
 const { generateRegistrationChallenge, parseRegisterRequest, parseLoginRequest, generateLoginChallenge, verifyAuthenticatorAssertion } = require("@webauthn/server");
 
 const { authenticator } = require("otplib");
@@ -42,7 +42,6 @@ app.post("/akkount/v1/login", async (req, res) => {
         return res.send({ message: `error`, error: true });
     }
     const email = sanitize(xss(req.query.email));
-    const redirect = sanitize(xss(req.query.from));
 
     const a = await db.get("login").findOne({
         email
@@ -67,8 +66,7 @@ app.post("/akkount/v1/login", async (req, res) => {
                     time: Date.now(),
                     token,
                     ip: req.headers["x-forwarded-for"],
-                    preSessionId,
-                    redirect
+                    preSessionId
                 }
             }
         );
@@ -78,8 +76,7 @@ app.post("/akkount/v1/login", async (req, res) => {
             time: Date.now(),
             token,
             ip: req.headers["x-forwarded-for"],
-            preSessionId,
-            redirect
+            preSessionId
         });
     }
 
@@ -196,8 +193,6 @@ app.get("/akkount/v1/createsession", async (req, res) => {
         email: a.email
     });
 
-    const firstTime = !user;
-
     //create new user if dont exist
     if (!user) {
         const userId = "u" + generateToken(14);
@@ -282,7 +277,7 @@ app.post("/akkount/v1/2fa/totp/generate", async (req, res) => {
         }
     );
 
-    QRCode.toDataURL(otpauth, (err, url) => {
+    qrcode.toDataURL(otpauth, (err, url) => {
         res.status(200).send({
             qrCode: url,
             secret
