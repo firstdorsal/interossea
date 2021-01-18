@@ -398,7 +398,7 @@ app.post("/akkount/v1/createsession/2fa/totp", async (req, res) => {
         });
 
         //if redirect was specified at login redirect to location
-        return res.send({ message: "invalid totp", error: true });
+        return res.send({ message: "Success", error: false });
     }
     return res.send({ message: "invalid totp", error: true });
 });
