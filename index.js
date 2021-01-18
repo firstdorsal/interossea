@@ -252,7 +252,6 @@ app.get("/akkount/v1/createsession", async (req, res) => {
         sameSite: "Strict"
     });
 
-    //if redirect was specified at login redirect to location
     return res.redirect("/2fa");
 });
 
@@ -393,7 +392,6 @@ app.post("/akkount/v1/createsession/2fa/totp", async (req, res) => {
             sameSite: "Strict"
         });
 
-        //if redirect was specified at login redirect to location
         return res.send({ message: "Success", error: false });
     }
     return res.send({ message: "invalid totp", error: true });
@@ -470,7 +468,6 @@ app.post("/akkount/v1/createsession/2fa/webauthn/verify", async (req, res) => {
             sameSite: "Strict"
         });
 
-        //if redirect was specified at login redirect to location
         return res.send({ message: "success", error: false });
     }
     return res.send({ message: "WebAuthn challenge failed", error: true });
