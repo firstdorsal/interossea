@@ -70,7 +70,7 @@ app.get("/akkount/v1/createsession", async (req, res) => {
         token: t
     });
     //check if token exists and hasnt expired
-    if (!a) return errorWebResponse(res, { message: "Invalid login token", error: true });
+    if (!a) return errorWebResponse(res, { message: "Invalid login token", error: true }, true);
 
     if (!a.time || a.time + 1000 * 60 * process.env.SLOWDOWN < Date.now()) {
         return errorWebResponse(res, { message: "Expired login token", error: true }, true);
