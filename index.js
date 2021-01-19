@@ -30,6 +30,7 @@ const webSchema = process.env.WEB_SCHEMA != undefined ? process.env.WEB_SCHEMA :
 console.log("debug mode set to " + process.env.DEBUG);
 const D = process.env.DEBUG;
 app.use(helmet.hidePoweredBy());
+app.disable("etag");
 
 app.use((req, res, next) => {
     if (req.get(`Host`) === process.env.WEB_URI) {
