@@ -163,15 +163,15 @@ app.get("/akkount/v1/createsession", async (req, res) => {
     if (!req.query.t) return res.send({ message: "no login token present", error: true });
 
     //sanitize the token
-    req.query.t = sanitize(xss(req.query.t));
+    const t = sanitize(xss(req.query.t));
 
     //find corresponding email for token
     const a = await db.get("login").findOne({
-        token: req.query.t
+        token: t
     });
     //delete login
     await db.get("login").findOneAndDelete({
-        token: req.query.t
+        token: t
     });
     //check if token exists and hasnt expired
     if (!a) return res.send({ message: "Invalid login token", error: true });
@@ -265,8 +265,8 @@ app.post("/akkount/v1/2fa/totp/generate", async (req, res) => {
     const a = await checkSession(req);
     if (!a) return res.send({ message: "invalid session", error: true });
     if (a.totpActive) {
-        if (!req.query || !req.query.replace || req.query.replace !== "true") {
-            return res.send({ message: "totp already activated; send the query replace=true to override", error: true, warning: "token is present" });
+        if (!req.body || !req.body.replace || req.body.replace !== "true") {
+            return res.send({ message: "totp already activated; send the body {replace:true} to override", error: true, warning: "token is present" });
         }
     }
     const secret = authenticator.generateSecret();
@@ -293,9 +293,9 @@ app.post("/akkount/v1/2fa/totp/generate", async (req, res) => {
 app.post("/akkount/v1/2fa/totp/register", async (req, res) => {
     const a = await checkSession(req);
     if (!a) return res.send({ message: "invalid session token", error: true });
-    if (!req.query) return res.send({ message: "no query specified", error: true });
-    if (!req.query.totp) return res.send({ message: "totp token missing", error: true });
-    if (authenticator.generate(a.totpSecret) === req.query.totp) {
+    if (!req.body) return res.send({ message: "missing body", error: true });
+    if (!req.body.totp) return res.send({ message: "totp token missing", error: true });
+    if (authenticator.generate(a.totpSecret) === req.body.totp) {
         await db.collection("user").findOneAndUpdate(
             {
                 _id: a._id
@@ -362,14 +362,14 @@ app.post("/akkount/v1/2fa/webauthn/register/verify", async (req, res) => {
 app.post("/akkount/v1/createsession/2fa/totp", async (req, res) => {
     if (!req.cookies) return res.send({ message: "missing cookies", error: true });
     if (!req.cookies.firstFactorToken) return res.send({ message: "missing firstFactorToken cookie", error: true });
-    if (!req.query) return res.send({ message: "missing query", error: true });
-    if (!req.query.totp) return res.send({ message: "missing totp query", error: true });
+    if (!req.body) return res.send({ message: "missing body", error: true });
+    if (!req.body.totp) return res.send({ message: "missing totp object in body", error: true });
 
     const login = await db.get("login").findOne({ firstFactorToken: req.cookies.firstFactorToken });
     if (!login) return res.send({ message: "invalid firstFactorToken", error: true });
 
     const user = await db.get("user").findOne({ userId: login.userId });
-    if (authenticator.generate(user.totpSecret) === req.query.totp) {
+    if (authenticator.generate(user.totpSecret) === req.body.totp) {
         //generate session id
         const newSessionID = generateToken(100);
 
