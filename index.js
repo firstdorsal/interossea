@@ -108,7 +108,7 @@ app.post("/akkount/v1/login", async (req, res) => {
                 "Reply-To": process.env.REPLY_TO
             },
             from: `"${process.env.FROM_NAME}" <${process.env.FROM_MAIL_ADDRESS}>`,
-            to: req.query.email,
+            to: req.body.email,
             subject: process.env.FROM_NAME,
             text: `Someone requested a link to log into your account. If this was you: Open this link in your browser ${link} Never share this link with anyone!`,
             html: `Someone requested a link to log into your account. If this was you: Click on the link to <a href="${link}"><b>Login</b></a> <p style="color:red;"> <b>Never share this link with anyone!</b></p>`
