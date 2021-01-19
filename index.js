@@ -42,6 +42,14 @@ const errorWebResponse = (responseObject, sendIfNotVerbose = false) => {
     return res.sendStatus(400);
 };
 
+app.use((req, res, next) => {
+    if (req.get(`Host`) === process.env.WEB_URI && req.get(`origin`) === webSchema + "://" + process.env.WEB_URI) {
+        return next();
+    }
+    return res.sendStatus(400);
+});
+
+//TODO ADD JWT AS COOKIE THAT PROOFS THAT USER HAS SIGNED IN BEFORE
 app.get("/akkount/v1/createsession", async (req, res) => {
     res.cookie("session", "", {
         maxAge: 1,
@@ -151,7 +159,7 @@ app.get("/akkount/v1/createsession", async (req, res) => {
 });
 
 app.use((req, res, next) => {
-    if (req.get(`Host`) === process.env.WEB_URI && req.get(`origin`) === webSchema + "://" + process.env.WEB_URI && req.is("application/json")) {
+    if (req.is("application/json")) {
         return next();
     }
     return res.sendStatus(400);
