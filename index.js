@@ -37,7 +37,7 @@ const secureCookieAttributes = { path: "/", httpOnly: true, secure: true, sameSi
 
 const errorWebResponse = (res, responseObject, sendIfNotVerbose = false) => {
     if (sendIfNotVerbose || V) {
-        return res.sendStatus(400).send(responseObject);
+        return res.send(responseObject);
     }
     return res.sendStatus(400).send({ message: "Error", error: true });
 };
