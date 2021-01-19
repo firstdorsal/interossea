@@ -52,3 +52,5 @@ wichtige accountverändernde sachen und csrf
 **alle cors und andere header bei allen anfragen**
 
 **bestehende 2fa kann nur mit korrektem bestehenden 2fa code geändert werden**
+
+**origin checken**

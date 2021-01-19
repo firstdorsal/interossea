@@ -5,6 +5,7 @@ const cookieParser = require("cookie-parser");
 const compression = require("compression");
 const bodyParser = require("body-parser");
 const cryptoRandomString = require("crypto-random-string");
+const helmet = require("helmet");
 
 const app = express();
 app.use(cookieParser());
@@ -28,9 +29,11 @@ console.log("server started");
 const webSchema = process.env.WEB_SCHEMA != undefined ? process.env.WEB_SCHEMA : "https";
 console.log("debug mode set to " + process.env.DEBUG);
 const D = process.env.DEBUG;
+app.use(helmet.hidePoweredBy());
 
 app.use((req, res, next) => {
     if (req.get(`Host`) === process.env.WEB_URI) {
+        console.log(req.headers);
         return next();
     }
     return res.sendStatus(400);
