@@ -33,10 +33,6 @@ app.use(helmet.hidePoweredBy());
 app.disable("etag");
 
 app.use((req, res, next) => {
-    console.log(req);
-    console.log(req.headers);
-    console.log(req.is("application/json"));
-
     if (req.get(`Host`) === process.env.WEB_URI && req.get(`origin`) === webSchema + "://" + process.env.WEB_URI && req.is("application/json")) {
         return next();
     }
