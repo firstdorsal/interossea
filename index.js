@@ -39,7 +39,7 @@ const errorWebResponse = (res, responseObject, sendIfNotVerbose = false) => {
     if (sendIfNotVerbose || V) {
         return res.sendStatus(400).send(responseObject);
     }
-    return res.sendStatus(400);
+    return res.sendStatus(400).send({ message: "Error", error: true });
 };
 
 //TODO ADD JWT AS COOKIE THAT PROOFS THAT USER HAS SIGNED IN BEFORE
