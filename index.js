@@ -10,7 +10,7 @@ const helmet = require("helmet");
 const app = express();
 app.use(cookieParser());
 app.use(compression());
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: "10kb" }));
 
 const nodemailer = require("nodemailer");
 const db = require("monk")(process.env.DB_URI, {
