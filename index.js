@@ -32,115 +32,6 @@ const D = process.env.DEBUG;
 app.use(helmet.hidePoweredBy());
 app.disable("etag");
 
-app.use((req, res, next) => {
-    if (req.get(`Host`) === process.env.WEB_URI && req.get(`origin`) === webSchema + "://" + process.env.WEB_URI && req.is("application/json")) {
-        return next();
-    }
-    return res.sendStatus(400);
-});
-
-app.post("/akkount/v1/login", async (req, res) => {
-    if (
-        !req.body ||
-        !req.body.email ||
-        !req.body.email.match(/^(([^<>()\[\]\\.,;:\s@"]{1,64}(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".{1,62}"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]{1,63}\.)+[a-zA-Z]{2,63}))$/)
-    ) {
-        return res.send({ message: `error`, error: true });
-    }
-    const email = sanitize(xss(req.body.email));
-
-    const a = await db.get("login").findOne({
-        email
-    });
-    const token = generateToken(100);
-    const preSessionId = generateToken(100);
-    const link = `${webSchema}://${process.env.WEB_URI}/akkount/v1/createsession?t=${token}`;
-    if (a) {
-        if (a.time + 1000 * 60 * process.env.SLOWDOWN > Date.now()) {
-            const wait = (a.time + 1000 * 60 * process.env.SLOWDOWN - Date.now()) / 1000;
-            return res.send({
-                message: `Please wait another ${wait}s before requesting a new login mail`,
-                error: true
-            });
-        }
-        db.get("login").findOneAndUpdate(
-            {
-                email
-            },
-            {
-                $set: {
-                    time: Date.now(),
-                    token,
-                    ip: req.headers["x-forwarded-for"],
-                    preSessionId
-                }
-            }
-        );
-    } else {
-        db.get("login").insert({
-            email,
-            time: Date.now(),
-            token,
-            ip: req.headers["x-forwarded-for"],
-            preSessionId
-        });
-    }
-
-    const transporter = nodemailer.createTransport({
-        host: process.env.MAIL_HOST,
-        port: 465,
-        secure: true,
-        tls: {
-            rejectUnauthorized: true
-        },
-        auth: {
-            user: process.env.LOGIN_MAIL_USERNAME,
-            pass: process.env.LOGIN_MAIL_PASSWORD
-        }
-    });
-
-    transporter.sendMail(
-        {
-            headers: {
-                "User-Agent": process.env.MAIL_AGENT,
-                "X-Mailer": process.env.MAIL_AGENT,
-                "Reply-To": process.env.REPLY_TO
-            },
-            from: `"${process.env.FROM_NAME}" <${process.env.FROM_MAIL_ADDRESS}>`,
-            to: req.body.email,
-            subject: process.env.FROM_NAME,
-            text: `Someone requested a link to log into your account. If this was you: Open this link in your browser ${link} Never share this link with anyone!`,
-            html: `Someone requested a link to log into your account. If this was you: Click on the link to <a href="${link}"><b>Login</b></a> <p style="color:red;"> <b>Never share this link with anyone!</b></p>`
-        },
-        (error, info) => {
-            if (error) return res.send({ message: "Invalid email", error: true });
-
-            res.cookie("preSessionId", preSessionId, {
-                maxAge: 10000000,
-                path: "/",
-                httpOnly: true,
-                secure: true,
-                sameSite: "Strict"
-            });
-            res.cookie("session", "", {
-                maxAge: 1,
-                path: "/",
-                httpOnly: true,
-                secure: true,
-                sameSite: "Strict"
-            });
-            res.cookie("firstFactorToken", "", {
-                maxAge: 1,
-                path: "/",
-                httpOnly: true,
-                secure: true,
-                sameSite: "Strict"
-            });
-            return res.send({ message: "Success", error: false });
-        }
-    );
-});
-
 app.get("/akkount/v1/createsession", async (req, res) => {
     res.cookie("session", "", {
         maxAge: 1,
@@ -259,6 +150,115 @@ app.get("/akkount/v1/createsession", async (req, res) => {
     });
 
     return res.redirect("/2fa");
+});
+
+app.use((req, res, next) => {
+    if (req.get(`Host`) === process.env.WEB_URI && req.get(`origin`) === webSchema + "://" + process.env.WEB_URI && req.is("application/json")) {
+        return next();
+    }
+    return res.sendStatus(400);
+});
+
+app.post("/akkount/v1/login", async (req, res) => {
+    if (
+        !req.body ||
+        !req.body.email ||
+        !req.body.email.match(/^(([^<>()\[\]\\.,;:\s@"]{1,64}(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".{1,62}"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]{1,63}\.)+[a-zA-Z]{2,63}))$/)
+    ) {
+        return res.send({ message: `error`, error: true });
+    }
+    const email = sanitize(xss(req.body.email));
+
+    const a = await db.get("login").findOne({
+        email
+    });
+    const token = generateToken(100);
+    const preSessionId = generateToken(100);
+    const link = `${webSchema}://${process.env.WEB_URI}/akkount/v1/createsession?t=${token}`;
+    if (a) {
+        if (a.time + 1000 * 60 * process.env.SLOWDOWN > Date.now()) {
+            const wait = (a.time + 1000 * 60 * process.env.SLOWDOWN - Date.now()) / 1000;
+            return res.send({
+                message: `Please wait another ${wait}s before requesting a new login mail`,
+                error: true
+            });
+        }
+        db.get("login").findOneAndUpdate(
+            {
+                email
+            },
+            {
+                $set: {
+                    time: Date.now(),
+                    token,
+                    ip: req.headers["x-forwarded-for"],
+                    preSessionId
+                }
+            }
+        );
+    } else {
+        db.get("login").insert({
+            email,
+            time: Date.now(),
+            token,
+            ip: req.headers["x-forwarded-for"],
+            preSessionId
+        });
+    }
+
+    const transporter = nodemailer.createTransport({
+        host: process.env.MAIL_HOST,
+        port: 465,
+        secure: true,
+        tls: {
+            rejectUnauthorized: true
+        },
+        auth: {
+            user: process.env.LOGIN_MAIL_USERNAME,
+            pass: process.env.LOGIN_MAIL_PASSWORD
+        }
+    });
+
+    transporter.sendMail(
+        {
+            headers: {
+                "User-Agent": process.env.MAIL_AGENT,
+                "X-Mailer": process.env.MAIL_AGENT,
+                "Reply-To": process.env.REPLY_TO
+            },
+            from: `"${process.env.FROM_NAME}" <${process.env.FROM_MAIL_ADDRESS}>`,
+            to: req.body.email,
+            subject: process.env.FROM_NAME,
+            text: `Someone requested a link to log into your account. If this was you: Open this link in your browser ${link} Never share this link with anyone!`,
+            html: `Someone requested a link to log into your account. If this was you: Click on the link to <a href="${link}"><b>Login</b></a> <p style="color:red;"> <b>Never share this link with anyone!</b></p>`
+        },
+        (error, info) => {
+            if (error) return res.send({ message: "Invalid email", error: true });
+
+            res.cookie("preSessionId", preSessionId, {
+                maxAge: 10000000,
+                path: "/",
+                httpOnly: true,
+                secure: true,
+                sameSite: "Strict"
+            });
+            res.cookie("session", "", {
+                maxAge: 1,
+                path: "/",
+                httpOnly: true,
+                secure: true,
+                sameSite: "Strict"
+            });
+            res.cookie("firstFactorToken", "", {
+                maxAge: 1,
+                path: "/",
+                httpOnly: true,
+                secure: true,
+                sameSite: "Strict"
+            });
+            return res.send({ message: "Success", error: false });
+        }
+    );
 });
 
 app.post("/akkount/v1/2fa/totp/generate", async (req, res) => {
