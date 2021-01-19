@@ -39,7 +39,7 @@ const errorWebResponse = (res, responseObject, sendIfNotVerbose = false) => {
     if (sendIfNotVerbose || V) {
         return res.send(responseObject);
     }
-    return res.sendStatus(400).send({ message: "Error", error: true });
+    return res.send({ message: "Error", error: true });
 };
 
 //TODO ADD JWT AS COOKIE THAT PROOFS THAT USER HAS SIGNED IN BEFORE
@@ -155,7 +155,7 @@ app.use((req, res, next) => {
     if (req.get(`Host`) === process.env.WEB_URI && req.get(`origin`) === webSchema + "://" + process.env.WEB_URI && req.is("application/json")) {
         return next();
     }
-    return res.sendStatus(400);
+    return res.send({ message: "Error", error: true });
 });
 
 app.post("/akkount/v1/login", async (req, res) => {
