@@ -3,14 +3,12 @@ require(`dotenv`).config();
 const express = require("express");
 const cookieParser = require("cookie-parser");
 const compression = require("compression");
-const cors = require("cors");
 const bodyParser = require("body-parser");
 const cryptoRandomString = require("crypto-random-string");
 
 const app = express();
 app.use(cookieParser());
 app.use(compression());
-app.use(cors());
 app.use(bodyParser.json());
 
 const nodemailer = require("nodemailer");
