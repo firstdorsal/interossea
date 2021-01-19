@@ -29,10 +29,18 @@ console.log("server started");
 const webSchema = process.env.WEB_SCHEMA != undefined ? process.env.WEB_SCHEMA : "https";
 console.log("debug mode set to " + process.env.DEBUG);
 const D = process.env.DEBUG;
+const V = process.env.VERBOSE_WEB_RESPONSES;
 app.use(helmet.hidePoweredBy());
 app.disable("etag");
 
 const secureCookieAttributes = { path: "/", httpOnly: true, secure: true, sameSite: "Strict" };
+
+const errorWebResponse = (responseObject, sendIfNotVerbose = false) => {
+    if (sendIfNotVerbose || V) {
+        return res.sendStatus(400).send(responseObject);
+    }
+    return res.sendStatus(400);
+};
 
 app.get("/akkount/v1/createsession", async (req, res) => {
     res.cookie("session", "", {
@@ -45,9 +53,9 @@ app.get("/akkount/v1/createsession", async (req, res) => {
     });
 
     // send error if token is missing
-    if (!req.query) return res.send({ message: "no query specified", error: true });
+    if (!req.query) return errorWebResponse({ message: "no query specified", error: true });
 
-    if (!req.query.t) return res.send({ message: "no login token present", error: true });
+    if (!req.query.t) return errorWebResponse({ message: "no login token present", error: true });
 
     //sanitize the token
     const t = sanitize(xss(req.query.t));
@@ -61,24 +69,24 @@ app.get("/akkount/v1/createsession", async (req, res) => {
         token: t
     });
     //check if token exists and hasnt expired
-    if (!a) return res.send({ message: "Invalid login token", error: true });
+    if (!a) return errorWebResponse({ message: "Invalid login token", error: true });
 
     if (!a.time || a.time + 1000 * 60 * process.env.SLOWDOWN < Date.now()) {
-        return res.send({ message: "Expired login token", error: true });
+        return errorWebResponse({ message: "Expired login token", error: true }, true);
     }
     //check if ip requesting the token is the same as ip trying to start a session with it
     if (!a.ip || a.ip !== req.headers["x-forwarded-for"]) {
-        return res.send({ message: "Request was sent from a different IP", error: true });
+        return errorWebResponse({ message: "Request was sent from a different IP", error: true }, true);
     }
-    if (!req.cookies) return res.send({ message: "missing cookies", error: true });
+    if (!req.cookies) return errorWebResponse({ message: "missing cookies", error: true });
 
-    if (!req.cookies.preSessionId) return res.send({ message: "missing preSessionId cookie", error: true });
+    if (!req.cookies.preSessionId) return errorWebResponse({ message: "missing preSessionId cookie: Request was sent from a different origin/browser", error: true }, true);
 
     const preSessionId = sanitize(xss(req.cookies.preSessionId));
 
     //check if browser origin and device is the same
     if (!a.preSessionId || a.preSessionId !== preSessionId) {
-        return res.send({ message: "invalid preSessionId cookie: Request was sent from a different origin/browser", error: true });
+        return errorWebResponse({ message: "invalid preSessionId cookie: Request was sent from a different origin/browser", error: true }, true);
     }
 
     //try to find user with email
@@ -155,7 +163,7 @@ app.post("/akkount/v1/login", async (req, res) => {
         !req.body.email ||
         !req.body.email.match(/^(([^<>()\[\]\\.,;:\s@"]{1,64}(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".{1,62}"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]{1,63}\.)+[a-zA-Z]{2,63}))$/)
     ) {
-        return res.send({ message: `error`, error: true });
+        return errorWebResponse({ message: `invalid mail`, error: true });
     }
     const email = sanitize(xss(req.body.email));
 
@@ -168,10 +176,13 @@ app.post("/akkount/v1/login", async (req, res) => {
     if (a) {
         if (a.time + 1000 * 60 * process.env.SLOWDOWN > Date.now()) {
             const wait = (a.time + 1000 * 60 * process.env.SLOWDOWN - Date.now()) / 1000;
-            return res.send({
-                message: `Please wait another ${wait}s before requesting a new login mail`,
-                error: true
-            });
+            return errorWebResponse(
+                {
+                    message: `Please wait another ${wait}s before requesting a new login mail`,
+                    error: true
+                },
+                true
+            );
         }
         db.get("login").findOneAndUpdate(
             {
@@ -237,17 +248,17 @@ app.post("/akkount/v1/login", async (req, res) => {
                 maxAge: 1,
                 ...secureCookieAttributes
             });
-            return res.send({ message: "Success", error: false });
+            return errorWebResponse({ message: "Success", error: false }, true);
         }
     );
 });
 
 app.post("/akkount/v1/2fa/totp/generate", async (req, res) => {
     const a = await checkSession(req);
-    if (!a) return res.send({ message: "invalid session", error: true });
+    if (!a) return errorWebResponse({ message: "invalid session", error: true }, true);
     if (a.totpActive) {
         if (!req.body || !req.body.replace || req.body.replace !== "true") {
-            return res.send({ message: "totp already activated; send the body {replace:true} to override", error: true, warning: "token is present" });
+            return errorWebResponse({ message: "totp already activated; send the body {replace:true} to override", error: true, warning: "token is present" }, true);
         }
     }
     const secret = authenticator.generateSecret();
@@ -273,9 +284,9 @@ app.post("/akkount/v1/2fa/totp/generate", async (req, res) => {
 
 app.post("/akkount/v1/2fa/totp/register", async (req, res) => {
     const a = await checkSession(req);
-    if (!a) return res.send({ message: "invalid session token", error: true });
-    if (!req.body) return res.send({ message: "missing body", error: true });
-    if (!req.body.totp) return res.send({ message: "totp token missing", error: true });
+    if (!a) return errorWebResponse({ message: "invalid session token", error: true }, true);
+    if (!req.body) return errorWebResponse({ message: "missing body", error: true });
+    if (!req.body.totp) return errorWebResponse({ message: "totp token missing", error: true });
     if (authenticator.generate(a.totpSecret) === req.body.totp) {
         await db.collection("user").findOneAndUpdate(
             {
@@ -287,14 +298,14 @@ app.post("/akkount/v1/2fa/totp/register", async (req, res) => {
                 }
             }
         );
-        return res.send({ message: "correct totp token", error: false });
+        return errorWebResponse({ message: "correct totp token", error: false }, true);
     }
-    return res.send({ message: "invalid totp token", error: true });
+    return errorWebResponse({ message: "invalid totp token", error: true }, true);
 });
 
 app.post("/akkount/v1/2fa/webauthn/register/request", async (req, res) => {
     const user = await checkSession(req);
-    if (!user) return res.send({ message: "invalid session token", error: true });
+    if (!user) return errorWebResponse({ message: "invalid session token", error: true }, true);
 
     const challengeResponse = generateRegistrationChallenge({
         relyingParty: { name: process.env.DISPLAY_NAME },
@@ -317,7 +328,7 @@ app.post("/akkount/v1/2fa/webauthn/register/request", async (req, res) => {
 
 app.post("/akkount/v1/2fa/webauthn/register/verify", async (req, res) => {
     const user = await checkSession(req);
-    if (!user) return res.send({ message: "invalid session token", error: true });
+    if (!user) return errorWebResponse({ message: "invalid session token", error: true }, true);
 
     const { key, challenge } = parseRegisterRequest(req.body);
     db.collection("user").findOne({ webAuthnRegisterChallenge: challenge });
@@ -335,19 +346,19 @@ app.post("/akkount/v1/2fa/webauthn/register/verify", async (req, res) => {
                 }
             }
         );
-        return res.send({ message: "Success", error: false });
+        return errorWebResponse({ message: "Success", error: false }, true);
     }
-    return res.send({ message: "WebAuthn challenge failed", error: true });
+    return errorWebResponse({ message: "WebAuthn challenge failed", error: true }, true);
 });
 
 app.post("/akkount/v1/createsession/2fa/totp", async (req, res) => {
-    if (!req.cookies) return res.send({ message: "missing cookies", error: true });
-    if (!req.cookies.firstFactorToken) return res.send({ message: "missing firstFactorToken cookie", error: true });
-    if (!req.body) return res.send({ message: "missing body", error: true });
-    if (!req.body.totp) return res.send({ message: "missing totp object in body", error: true });
+    if (!req.cookies) return errorWebResponse({ message: "missing cookies", error: true });
+    if (!req.cookies.firstFactorToken) return errorWebResponse({ message: "missing firstFactorToken cookie", error: true });
+    if (!req.body) return errorWebResponse({ message: "missing body", error: true });
+    if (!req.body.totp) return errorWebResponse({ message: "missing totp object in body", error: true });
 
     const login = await db.get("login").findOne({ firstFactorToken: req.cookies.firstFactorToken });
-    if (!login) return res.send({ message: "invalid firstFactorToken", error: true });
+    if (!login) return errorWebResponse({ message: "invalid firstFactorToken", error: true });
 
     const user = await db.get("user").findOne({ userId: login.userId });
     if (authenticator.generate(user.totpSecret) === req.body.totp) {
@@ -373,22 +384,22 @@ app.post("/akkount/v1/createsession/2fa/totp", async (req, res) => {
             ...secureCookieAttributes
         });
 
-        return res.send({ message: "Success", error: false });
+        return errorWebResponse({ message: "Success", error: false }, true);
     }
-    return res.send({ message: "invalid totp", error: true });
+    return errorWebResponse({ message: "invalid totp", error: true }, true);
 });
 
 app.post("/akkount/v1/createsession/2fa/webauthn/request", async (req, res) => {
-    if (!req.cookies) return res.send({ message: "missing cookies", error: true });
-    if (!req.cookies.firstFactorToken) return res.send({ message: "missing firstFactorToken cookie", error: true });
+    if (!req.cookies) return errorWebResponse({ message: "missing cookies", error: true });
+    if (!req.cookies.firstFactorToken) return errorWebResponse({ message: "missing firstFactorToken cookie", error: true });
     const fft = sanitize(xss(req.cookies.firstFactorToken));
 
     const login = await db.get("login").findOne({ firstFactorToken: fft });
 
-    if (!login) return res.send({ message: "invalid firstFactorToken", error: true });
+    if (!login) return errorWebResponse({ message: "invalid firstFactorToken", error: true });
     const user = await db.get("user").findOne({ userId: login.userId });
-    if (!user) return res.send({ message: "user not found", error: true });
-    if (!user.webAuthnKey) return res.send({ message: "missing public key for this user", error: true });
+    if (!user) return errorWebResponse({ message: "user not found", error: true });
+    if (!user.webAuthnKey) return errorWebResponse({ message: "missing public key for this user", error: true });
 
     const newChallenge = generateLoginChallenge(user.webAuthnKey);
     db.collection("login").findOneAndUpdate(
@@ -405,20 +416,20 @@ app.post("/akkount/v1/createsession/2fa/webauthn/request", async (req, res) => {
     res.send(newChallenge);
 });
 app.post("/akkount/v1/createsession/2fa/webauthn/verify", async (req, res) => {
-    if (!req.cookies) return res.send({ message: "missing cookies", error: true });
-    if (!req.cookies.firstFactorToken) return res.send({ message: "missing firstFactorToken cookie", error: true });
-    if (!req.body) return res.send({ message: "missing body", error: true });
+    if (!req.cookies) return errorWebResponse({ message: "missing cookies", error: true });
+    if (!req.cookies.firstFactorToken) return errorWebResponse({ message: "missing firstFactorToken cookie", error: true });
+    if (!req.body) return errorWebResponse({ message: "missing body", error: true });
     const login = await db.get("login").findOne({ firstFactorToken: req.cookies.firstFactorToken });
-    if (!login) return res.send({ message: "invalid firstFactorToken", error: true });
+    if (!login) return errorWebResponse({ message: "invalid firstFactorToken", error: true });
     const user = await db.get("user").findOne({ userId: login.userId });
-    if (!user) return res.send({ message: "user not found", error: true });
-    if (!user.webAuthnKey) return res.send({ message: "missing public key for this user", error: true });
+    if (!user) return errorWebResponse({ message: "user not found", error: true });
+    if (!user.webAuthnKey) return errorWebResponse({ message: "missing public key for this user", error: true });
 
     const { challenge, keyId } = parseLoginRequest(req.body);
 
-    if (!challenge) return res.send({ message: "missing challenge", error: true });
-    if (user.webAuthnKey.credID !== keyId) return res.send({ message: "invalid webAuthnKey", error: true });
-    if (login.webAuthnLoginChallenge !== challenge) return res.send({ message: "invalid challenge", error: true });
+    if (!challenge) return errorWebResponse({ message: "missing challenge", error: true });
+    if (user.webAuthnKey.credID !== keyId) return errorWebResponse({ message: "invalid webAuthnKey", error: true });
+    if (login.webAuthnLoginChallenge !== challenge) return errorWebResponse({ message: "invalid challenge", error: true });
     //solvedChallenge === login.webAuthnLoginChallenge
     if (verifyAuthenticatorAssertion(req.body, user.webAuthnKey)) {
         //generate session id
@@ -443,16 +454,16 @@ app.post("/akkount/v1/createsession/2fa/webauthn/verify", async (req, res) => {
             ...secureCookieAttributes
         });
 
-        return res.send({ message: "success", error: false });
+        return errorWebResponse({ message: "success", error: false }, true);
     }
-    return res.send({ message: "WebAuthn challenge failed", error: true });
+    return errorWebResponse({ message: "WebAuthn challenge failed", error: true }, true);
 });
 
 app.get("*", (req, res) => {
-    res.sendStatus(404);
+    res.sendStatus(400);
 });
 app.post("*", (req, res) => {
-    res.sendStatus(404);
+    res.sendStatus(400);
 });
 
 const checkSession = async req => {
