@@ -40,6 +40,7 @@ app.use((req, res, next) => {
 });
 
 app.post("/akkount/v1/login", async (req, res) => {
+    console.log(req.body);
     if (
         !req.body ||
         !req.body.email ||
