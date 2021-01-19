@@ -32,20 +32,16 @@ const D = process.env.DEBUG;
 app.use(helmet.hidePoweredBy());
 app.disable("etag");
 
+const secureCookieAttributes = { path: "/", httpOnly: true, secure: true, sameSite: "Strict" };
+
 app.get("/akkount/v1/createsession", async (req, res) => {
     res.cookie("session", "", {
         maxAge: 1,
-        path: "/",
-        httpOnly: true,
-        secure: true,
-        sameSite: "Strict"
+        ...secureCookieAttributes
     });
     res.cookie("preSessionId", "", {
         maxAge: 1,
-        path: "/",
-        httpOnly: true,
-        secure: true,
-        sameSite: "Strict"
+        ...secureCookieAttributes
     });
 
     // send error if token is missing
@@ -118,10 +114,7 @@ app.get("/akkount/v1/createsession", async (req, res) => {
         //append firstFactorToken cookie to response
         res.cookie("firstFactorToken", firstFactorToken, {
             maxAge: 10000000,
-            path: "/",
-            httpOnly: true,
-            secure: true,
-            sameSite: "Strict"
+            ...secureCookieAttributes
         });
 
         if (user.totpActive && user.webAuthnActive) return res.redirect("/login/2fa");
@@ -143,10 +136,7 @@ app.get("/akkount/v1/createsession", async (req, res) => {
     //append session cookie to response
     res.cookie("session", newSessionID, {
         maxAge: 10000000000,
-        path: "/",
-        httpOnly: true,
-        secure: true,
-        sameSite: "Strict"
+        ...secureCookieAttributes
     });
 
     return res.redirect("/2fa");
@@ -237,24 +227,15 @@ app.post("/akkount/v1/login", async (req, res) => {
 
             res.cookie("preSessionId", preSessionId, {
                 maxAge: 10000000,
-                path: "/",
-                httpOnly: true,
-                secure: true,
-                sameSite: "Strict"
+                ...secureCookieAttributes
             });
             res.cookie("session", "", {
                 maxAge: 1,
-                path: "/",
-                httpOnly: true,
-                secure: true,
-                sameSite: "Strict"
+                ...secureCookieAttributes
             });
             res.cookie("firstFactorToken", "", {
                 maxAge: 1,
-                path: "/",
-                httpOnly: true,
-                secure: true,
-                sameSite: "Strict"
+                ...secureCookieAttributes
             });
             return res.send({ message: "Success", error: false });
         }
@@ -385,17 +366,11 @@ app.post("/akkount/v1/createsession/2fa/totp", async (req, res) => {
         //append session cookie to response
         res.cookie("session", newSessionID, {
             maxAge: 10000000000,
-            path: "/",
-            httpOnly: true,
-            secure: true,
-            sameSite: "Strict"
+            ...secureCookieAttributes
         });
         res.cookie("firstFactorToken", "", {
             maxAge: 1,
-            path: "/",
-            httpOnly: true,
-            secure: true,
-            sameSite: "Strict"
+            ...secureCookieAttributes
         });
 
         return res.send({ message: "Success", error: false });
@@ -461,17 +436,11 @@ app.post("/akkount/v1/createsession/2fa/webauthn/verify", async (req, res) => {
         //append session cookie to response
         res.cookie("session", newSessionID, {
             maxAge: 10000000000,
-            path: "/",
-            httpOnly: true,
-            secure: true,
-            sameSite: "Strict"
+            ...secureCookieAttributes
         });
         res.cookie("firstFactorToken", "", {
             maxAge: 1,
-            path: "/",
-            httpOnly: true,
-            secure: true,
-            sameSite: "Strict"
+            ...secureCookieAttributes
         });
 
         return res.send({ message: "success", error: false });
