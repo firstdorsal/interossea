@@ -41,15 +41,13 @@ app.use((req, res, next) => {
 
 app.post("/akkount/v1/login", async (req, res) => {
     if (
-        !req.query ||
-        !req.query.email ||
-        !req.query.email.match(
-            /^(([^<>()\[\]\\.,;:\s@"]{1,64}(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".{1,62}"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]{1,63}\.)+[a-zA-Z]{2,63}))$/
-        )
+        !req.body ||
+        !req.body.email ||
+        !req.body.email.match(/^(([^<>()\[\]\\.,;:\s@"]{1,64}(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".{1,62}"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]{1,63}\.)+[a-zA-Z]{2,63}))$/)
     ) {
         return res.send({ message: `error`, error: true });
     }
-    const email = sanitize(xss(req.query.email));
+    const email = sanitize(xss(req.body.email));
 
     const a = await db.get("login").findOne({
         email
