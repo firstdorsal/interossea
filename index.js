@@ -6,6 +6,7 @@ const compression = require("compression");
 const bodyParser = require("body-parser");
 const cryptoRandomString = require("crypto-random-string");
 const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 
 const app = express();
 app.use(cookieParser());
@@ -34,6 +35,14 @@ app.use(helmet.hidePoweredBy());
 app.disable("etag");
 
 const secureCookieAttributes = { path: "/", httpOnly: true, secure: true, sameSite: "Strict" };
+
+const limiter = rateLimit({
+    windowMs: process.env.IP_REQUEST_TIME_MINUTES * 60 * 1000,
+    max: process.env
+});
+
+//  apply to all requests
+app.use(limiter);
 
 const errorWebResponse = (res, responseObject, sendIfNotVerbose = false) => {
     if (sendIfNotVerbose || V) {
@@ -72,7 +81,7 @@ app.get("/akkount/v1/createsession", async (req, res) => {
     //check if token exists and hasnt expired
     if (!a) return errorWebResponse(res, { message: "Invalid login token", error: true }, true);
 
-    if (!a.time || a.time + 1000 * 60 * process.env.SLOWDOWN < Date.now()) {
+    if (!a.time || a.time + 1000 * 60 * process.env.MAGIC_LINK_EXPIRE_MINUTES < Date.now()) {
         return errorWebResponse(res, { message: "Expired login token", error: true }, true);
     }
     //check if ip requesting the token is the same as ip trying to start a session with it
@@ -175,8 +184,8 @@ app.post("/akkount/v1/login", async (req, res) => {
     const preSessionId = generateToken(100);
     const link = `${webSchema}://${process.env.WEB_URI}/akkount/v1/createsession?t=${token}`;
     if (a) {
-        if (a.time + 1000 * 60 * process.env.SLOWDOWN > Date.now()) {
-            const wait = (a.time + 1000 * 60 * process.env.SLOWDOWN - Date.now()) / 1000;
+        if (a.time + 1000 * 60 * process.env.REQUEST_NEW_MAGIC_LINK_MINUTES > Date.now()) {
+            const wait = (a.time + 1000 * 60 * process.env.REQUEST_NEW_MAGIC_LINK_MINUTES - Date.now()) / 1000;
             return errorWebResponse(
                 res,
                 {
