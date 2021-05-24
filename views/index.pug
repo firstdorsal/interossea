@@ -1,0 +1,37 @@
+doctype html
+html(lang="en")
+    head
+        include /modules/head.pug
+        title Akkount
+    body 
+        main 
+            h1 Akkount
+            section
+                h2 What?
+                div Akkount is an Endpoint for 
+                    b easy, maximum privacy and high security 
+                    | authentication of web users. 
+                div Boiled down Akkount is using/extending the authentication  
+                    b of your e-mail address 
+                h2 How?
+                div 
+                    b Authentication links
+                div 
+                    b 2FA 
+                    | with 
+                    b U2F 
+                    | (Universal Second Factor) tokens and 
+                    b OTP 
+                    | (One Time Passwords)
+                div Use of a Fallback/Default 
+                    b frontend 
+                    | or your own
+                h2 Why?
+                div Passwords are broken
+                div
+                    a(href="https://youtu.be/DWrLBwi7ZBA" rel="noreferrer") YouTube: How FIDO U2F Security Keys Work by Jen Tong
+                div 
+                    a(href="https://youtu.be/Z20XNp-luNA" rel="noreferrer")  YouTube: Phishing as a Science
+                div U2F is easy and secure
+
+            include /modules/footer.pug

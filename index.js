@@ -7,6 +7,7 @@ const bodyParser = require("body-parser");
 const cryptoRandomString = require("crypto-random-string");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const path = require("path");
 
 const app = express();
 app.use(cookieParser());
@@ -33,16 +34,19 @@ const D = process.env.DEBUG;
 const V = process.env.VERBOSE_WEB_RESPONSES;
 app.use(helmet.hidePoweredBy());
 app.disable("etag");
+app.use(express.static("public"));
+app.set("view engine", "pug");
+app.locals.basedir = path.join(__dirname, "views");
 
 const secureCookieAttributes = { path: "/", httpOnly: true, secure: true, sameSite: "Strict" };
 
 const limiter = rateLimit({
     windowMs: process.env.IP_REQUEST_TIME_MINUTES * 60 * 1000,
-    max: process.env
+    max: process.env.IP_REQUEST_PER_TIME
 });
 
-//  apply to all requests
-app.use(limiter);
+//  only apply to login
+app.use("/v1/login", limiter);
 
 const errorWebResponse = (res, responseObject, sendIfNotVerbose = false) => {
     if (sendIfNotVerbose || V) {
@@ -51,8 +55,18 @@ const errorWebResponse = (res, responseObject, sendIfNotVerbose = false) => {
     return res.send({ message: "Error", error: true });
 };
 
+//frontend
+app.get("/", function (req, res) {
+    res.render("index");
+});
+if (!process.env.DISABLE_FRONTEND) {
+    app.get("/login", function (req, res) {
+        res.render("login/index");
+    });
+}
+
 //TODO ADD JWT AS COOKIE THAT PROOFS THAT USER HAS SIGNED IN BEFORE
-app.get("/akkount/v1/createsession", async (req, res) => {
+app.get("/v1/createsession", async (req, res) => {
     res.cookie("session", "", {
         maxAge: 1,
         ...secureCookieAttributes
@@ -167,7 +181,7 @@ app.use((req, res, next) => {
     return res.send({ message: "Error", error: true });
 });
 
-app.post("/akkount/v1/login", async (req, res) => {
+app.post("/v1/login", async (req, res) => {
     if (
         !req.body ||
         !req.body.email ||
@@ -182,7 +196,7 @@ app.post("/akkount/v1/login", async (req, res) => {
     });
     const token = generateToken(100);
     const preSessionId = generateToken(100);
-    const link = `${webSchema}://${process.env.WEB_URI}/akkount/v1/createsession?t=${token}`;
+    const link = `${webSchema}://${process.env.WEB_URI}/v1/createsession?t=${token}`;
     if (a) {
         if (a.time + 1000 * 60 * process.env.REQUEST_NEW_MAGIC_LINK_MINUTES > Date.now()) {
             const wait = (a.time + 1000 * 60 * process.env.REQUEST_NEW_MAGIC_LINK_MINUTES - Date.now()) / 1000;
@@ -264,7 +278,7 @@ app.post("/akkount/v1/login", async (req, res) => {
     );
 });
 
-app.post("/akkount/v1/2fa/totp/generate", async (req, res) => {
+app.post("/v1/2fa/totp/generate", async (req, res) => {
     const a = await checkSession(req);
     if (!a) return errorWebResponse(res, { message: "invalid session", error: true }, true);
     if (a.totpActive) {
@@ -293,7 +307,7 @@ app.post("/akkount/v1/2fa/totp/generate", async (req, res) => {
     });
 });
 
-app.post("/akkount/v1/2fa/totp/register", async (req, res) => {
+app.post("/v1/2fa/totp/register", async (req, res) => {
     const a = await checkSession(req);
     if (!a) return errorWebResponse(res, { message: "invalid session token", error: true }, true);
     if (!req.body) return errorWebResponse(res, { message: "missing body", error: true });
@@ -314,7 +328,7 @@ app.post("/akkount/v1/2fa/totp/register", async (req, res) => {
     return errorWebResponse(res, { message: "invalid totp token", error: true }, true);
 });
 
-app.post("/akkount/v1/2fa/webauthn/register/request", async (req, res) => {
+app.post("/v1/2fa/webauthn/register/request", async (req, res) => {
     const user = await checkSession(req);
     if (!user) return errorWebResponse(res, { message: "invalid session token", error: true }, true);
 
@@ -337,7 +351,7 @@ app.post("/akkount/v1/2fa/webauthn/register/request", async (req, res) => {
     return res.send(challengeResponse);
 });
 
-app.post("/akkount/v1/2fa/webauthn/register/verify", async (req, res) => {
+app.post("/v1/2fa/webauthn/register/verify", async (req, res) => {
     const user = await checkSession(req);
     if (!user) return errorWebResponse(res, { message: "invalid session token", error: true }, true);
 
@@ -362,7 +376,7 @@ app.post("/akkount/v1/2fa/webauthn/register/verify", async (req, res) => {
     return errorWebResponse(res, { message: "WebAuthn challenge failed", error: true }, true);
 });
 
-app.post("/akkount/v1/createsession/2fa/totp", async (req, res) => {
+app.post("/v1/createsession/2fa/totp", async (req, res) => {
     if (!req.cookies) return errorWebResponse(res, { message: "missing cookies", error: true });
     if (!req.cookies.firstFactorToken) return errorWebResponse(res, { message: "missing firstFactorToken cookie", error: true });
     if (!req.body) return errorWebResponse(res, { message: "missing body", error: true });
@@ -400,7 +414,7 @@ app.post("/akkount/v1/createsession/2fa/totp", async (req, res) => {
     return errorWebResponse(res, { message: "invalid totp", error: true }, true);
 });
 
-app.post("/akkount/v1/createsession/2fa/webauthn/request", async (req, res) => {
+app.post("/v1/createsession/2fa/webauthn/request", async (req, res) => {
     if (!req.cookies) return errorWebResponse(res, { message: "missing cookies", error: true });
     if (!req.cookies.firstFactorToken) return errorWebResponse(res, { message: "missing firstFactorToken cookie", error: true });
     const fft = sanitize(xss(req.cookies.firstFactorToken));
@@ -426,7 +440,7 @@ app.post("/akkount/v1/createsession/2fa/webauthn/request", async (req, res) => {
     newChallenge.userVerification = "preferred";
     res.send(newChallenge);
 });
-app.post("/akkount/v1/createsession/2fa/webauthn/verify", async (req, res) => {
+app.post("/v1/createsession/2fa/webauthn/verify", async (req, res) => {
     if (!req.cookies) return errorWebResponse(res, { message: "missing cookies", error: true });
     if (!req.cookies.firstFactorToken) return errorWebResponse(res, { message: "missing firstFactorToken cookie", error: true });
     if (!req.body) return errorWebResponse(res, { message: "missing body", error: true });

@@ -1,3 +1,5 @@
+//yarn add pug --ignore-engines
+
 # Data to be provided
 
 ```.env
@@ -15,7 +17,7 @@ WEB_SCHEMA='http' //defaults to https
 
 WEB_URI='localhost'
 
-
+VERBOSE_WEB_RESPONSES=true
 MAGIC_LINK_EXPIRE_MINUTES=10
 REQUEST_NEW_MAGIC_LINK_MINUTES=0.5
 
@@ -59,3 +61,8 @@ wichtige accountverändernde sachen und csrf
 **bestehende 2fa kann nur mit korrektem bestehenden 2fa code geändert werden**
 
 **origin checken**
+
+ip rate limits werden angewendet
+FUNKTIONIERT MIT REVERSE PROXY?
+um im zweifelsfall dos zu verhindern alternative methode um einen magic link anzufordern
+zusätzlicher request magic link in jeder magic link mail

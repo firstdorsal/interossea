@@ -8,7 +8,7 @@
     },
     "repository": {
         "type": "git",
-        "url": "http://git.firstdorsal.eu/firstdorsal/akkount.git"
+        "url": "https://git.y.gy/firstdorsal/akkount.git"
     },
     "author": "Paul Colin Hennig",
     "devDependencies": {
@@ -18,6 +18,7 @@
         "jsdoc-to-markdown": "^6.0.1"
     },
     "dependencies": {
+        "@fontsource/inter": "^4.3.0",
         "@webauthn/server": "^0.1.3",
         "body-parser": "^1.19.0",
         "compression": "^1.7.4",
@@ -30,6 +31,7 @@
         "monk": "^7.3.2",
         "nodemailer": "^6.4.11",
         "otplib": "^12.0.1",
+        "pug": "^3.0.2",
         "qrcode": "^1.4.4",
         "randomstring": "^1.1.5",
         "xss": "^1.0.8"

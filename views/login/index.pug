@@ -1,0 +1,15 @@
+html(lang="en")
+    head
+        include /modules/head.pug
+        title Login
+    body 
+        main 
+            h1 Login
+            div No classic registration required! 
+            | Upon entering your E-Mail we will send you a link to login.
+            section
+                div.emailInput
+                    label(for="email").icon E-Mail
+                    input(type="email", name="email" spellcheck="false" placeholder="mail@example.com")
+                button(disabled="true") Login
+            include /modules/footer.pug
