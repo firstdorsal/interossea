@@ -60,7 +60,7 @@ h1,
 h2 {
     font-family: "Inter", sans-serif;
     font-weight: 900;
-    padding-top: 20px;
+    padding-top: 10px;
 }
 footer {
     margin-top: 50px;
@@ -122,8 +122,58 @@ label[for="email"] {
     background-image: url("/images/mail.svg");
 }
 
-*[disabled="true"] {
+.hidden {
+    display: none;
+}
+
+*:disabled {
     background: var(--primary);
     color: var(--text-color);
     opacity: 20%;
+    cursor: default;
+}
+
+#default,
+#waiting,
+#success {
+    height: 150px;
+}
+
+#waiting {
+    text-align: center;
+}
+
+#success h1 {
+    margin-top: 0px;
+}
+
+.emailInput {
+    margin-top: 10px;
+}
+
+.lds-dual-ring {
+    display: inline-block;
+    width: 100px;
+    height: 100px;
+    transform: scale(0.6);
+    transform-origin: center;
+}
+.lds-dual-ring:after {
+    content: " ";
+    display: block;
+    width: 64px;
+    height: 64px;
+    margin: 8px;
+    border-radius: 50%;
+    border: 6px solid var(--text-color);
+    border-color: var(--text-color) transparent var(--text-color) transparent;
+    animation: lds-dual-ring 1.2s linear infinite;
+}
+@keyframes lds-dual-ring {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
 }

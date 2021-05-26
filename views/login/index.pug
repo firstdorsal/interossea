@@ -5,11 +5,19 @@ html(lang="en")
     body 
         main 
             h1 Login
-            div No classic registration required! 
-            | Upon entering your E-Mail we will send you a link to login.
-            section
+            section#form.hidden
+                div No classic registration required! 
+                | Upon entering your E-Mail we will send you a link to login.
                 div.emailInput
                     label(for="email").icon E-Mail
-                    input(type="email", name="email" spellcheck="false" placeholder="mail@example.com")
-                button(disabled="true") Login
-            include /modules/footer.pug
+                    input#email(type="email" name="email" spellcheck="false" placeholder="mail@example.com")
+                button(disabled)#login Login
+                div#statusMessage
+            section#waiting.hidden
+                div.lds-dual-ring
+                div Please wait...
+            section#success
+                h1 Success!
+                div A link was sent to your E-Mail. Please open it on the same browser/device. The mail delivery may take a moment. Don't forget to check your spam folder.
+            //include /modules/footer.pug
+        script(src="script.js") 

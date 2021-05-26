@@ -30,8 +30,7 @@ console.log("server started");
 //if (process.env.DEVELOPMENT) db.get("login").drop();
 const webSchema = process.env.WEB_SCHEMA != undefined ? process.env.WEB_SCHEMA : "https";
 console.log("debug mode set to " + process.env.DEBUG);
-const D = process.env.DEBUG;
-const V = process.env.VERBOSE_WEB_RESPONSES;
+const V = process.env.DEBUG;
 app.use(helmet.hidePoweredBy());
 app.disable("etag");
 app.use(express.static("public"));
@@ -175,6 +174,7 @@ app.get("/v1/createsession", async (req, res) => {
 });
 
 app.use((req, res, next) => {
+    if (V) return next();
     if (req.get(`Host`) === process.env.WEB_URI && req.get(`origin`) === webSchema + "://" + process.env.WEB_URI && req.is("application/json")) {
         return next();
     }
