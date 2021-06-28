@@ -1,43 +1,44 @@
-"use strict";
+`use strict`;
 require(`dotenv`).config();
-const express = require("express");
-const cookieParser = require("cookie-parser");
-const compression = require("compression");
-const bodyParser = require("body-parser");
-const cryptoRandomString = require("crypto-random-string");
-const helmet = require("helmet");
-const rateLimit = require("express-rate-limit");
-const path = require("path");
+const express = require(`express`);
+const cookieParser = require(`cookie-parser`);
+const compression = require(`compression`);
+const bodyParser = require(`body-parser`);
+const cryptoRandomString = require(`crypto-random-string`);
+const helmet = require(`helmet`);
+const rateLimit = require(`express-rate-limit`);
+const path = require(`path`);
 
 const app = express();
 app.use(cookieParser());
 app.use(compression());
-app.use(bodyParser.json({ limit: "10kb" }));
+app.use(bodyParser.json({ limit: `10kb` }));
 
-const nodemailer = require("nodemailer");
-const db = require("monk")(process.env.DB_URI, {
+const nodemailer = require(`nodemailer`);
+const db = require(`monk`)(process.env.DB_URI, {
     useUnifiedTopology: true
 });
-const sanitize = require("mongo-sanitize");
-const xss = require("xss");
-const qrcode = require("qrcode");
-const { generateRegistrationChallenge, parseRegisterRequest, parseLoginRequest, generateLoginChallenge, verifyAuthenticatorAssertion } = require("@webauthn/server");
+const sanitize = require(`mongo-sanitize`);
+const xss = require(`xss`);
+const qrcode = require(`qrcode`);
+const { generateRegistrationChallenge, parseRegisterRequest, parseLoginRequest, generateLoginChallenge, verifyAuthenticatorAssertion } = require(`@webauthn/server`);
 
-const { authenticator } = require("otplib");
+const { authenticator } = require(`otplib`);
 
 app.listen(process.env.PORT !== undefined ? process.env.PORT : 80);
-console.log("server started");
-//if (process.env.DEVELOPMENT) db.get("login").drop();
-const webSchema = process.env.WEB_SCHEMA != undefined ? process.env.WEB_SCHEMA : "https";
-console.log("debug mode set to " + process.env.DEBUG);
+console.log(`server started`);
+//if (process.env.DEVELOPMENT) db.get(`login`).drop();
+const webSchema = process.env.WEB_SCHEMA != undefined ? process.env.WEB_SCHEMA : `https`;
+console.log(`debug mode set to ` + process.env.DEBUG);
 const V = process.env.DEBUG;
+const BASE_URL = process.env.BASE_URL !== undefined ? process.env.BASE_URL : ``;
 app.use(helmet.hidePoweredBy());
-app.disable("etag");
-app.use(express.static("public"));
-app.set("view engine", "pug");
-app.locals.basedir = path.join(__dirname, "views");
+app.disable(`etag`);
+app.use(express.static(`public`));
+app.set(`view engine`, `pug`);
+app.locals.basedir = path.join(__dirname, `views`);
 
-const secureCookieAttributes = { path: "/", httpOnly: true, secure: true, sameSite: "Strict" };
+const secureCookieAttributes = { path: `/`, httpOnly: true, secure: true, sameSite: `Strict` };
 
 const limiter = rateLimit({
     windowMs: process.env.IP_REQUEST_TIME_MINUTES * 60 * 1000,
@@ -45,87 +46,87 @@ const limiter = rateLimit({
 });
 
 //  only apply to login
-app.use("/v1/login", limiter);
+app.use(`${BASE_URL}/v1/login`, limiter);
 
 const errorWebResponse = (res, responseObject, sendIfNotVerbose = false) => {
     if (sendIfNotVerbose || V) {
         return res.send(responseObject);
     }
-    return res.send({ message: "Error", error: true });
+    return res.send({ message: `Error`, error: true });
 };
 
 //frontend
-app.get("/", function (req, res) {
-    res.render("index");
+app.get(`/`, function (req, res) {
+    res.render(`index`);
 });
 if (!process.env.DISABLE_FRONTEND) {
-    app.get("/login", function (req, res) {
-        res.render("login/index");
+    app.get(`/login`, function (req, res) {
+        res.render(`login/index`);
     });
 }
 
 //TODO ADD JWT AS COOKIE THAT PROOFS THAT USER HAS SIGNED IN BEFORE
-app.get("/v1/createsession", async (req, res) => {
-    res.cookie("session", "", {
+app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
+    res.cookie(`session`, ``, {
         maxAge: 1,
         ...secureCookieAttributes
     });
-    res.cookie("preSessionId", "", {
+    res.cookie(`preSessionId`, ``, {
         maxAge: 1,
         ...secureCookieAttributes
     });
 
     // send error if token is missing
-    if (!req.query) return errorWebResponse(res, { message: "no query specified", error: true });
+    if (!req.query) return errorWebResponse(res, { message: `no query specified`, error: true });
 
-    if (!req.query.t) return errorWebResponse(res, { message: "no login token present", error: true });
+    if (!req.query.t) return errorWebResponse(res, { message: `no login token present`, error: true });
 
     //sanitize the token
     const t = sanitize(xss(req.query.t));
 
     //find corresponding email for token
-    const a = await db.get("login").findOne({
+    const a = await db.get(`login`).findOne({
         token: t
     });
     //delete login
-    await db.get("login").findOneAndDelete({
+    await db.get(`login`).findOneAndDelete({
         token: t
     });
     //check if token exists and hasnt expired
-    if (!a) return errorWebResponse(res, { message: "Invalid login token", error: true }, true);
+    if (!a) return errorWebResponse(res, { message: `Invalid login token`, error: true }, true);
 
     if (!a.time || a.time + 1000 * 60 * process.env.MAGIC_LINK_EXPIRE_MINUTES < Date.now()) {
-        return errorWebResponse(res, { message: "Expired login token", error: true }, true);
+        return errorWebResponse(res, { message: `Expired login token`, error: true }, true);
     }
     //check if ip requesting the token is the same as ip trying to start a session with it
-    if (!a.ip || a.ip !== req.headers["x-forwarded-for"]) {
-        return errorWebResponse(res, { message: "Request was sent from a different IP", error: true }, true);
+    if (!a.ip || a.ip !== req.headers[`x-forwarded-for`]) {
+        return errorWebResponse(res, { message: `Request was sent from a different IP`, error: true }, true);
     }
-    if (!req.cookies) return errorWebResponse(res, { message: "missing cookies", error: true });
+    if (!req.cookies) return errorWebResponse(res, { message: `missing cookies`, error: true });
 
-    if (!req.cookies.preSessionId) return errorWebResponse(res, { message: "missing preSessionId cookie: Request was sent from a different origin/browser", error: true }, true);
+    if (!req.cookies.preSessionId) return errorWebResponse(res, { message: `missing preSessionId cookie: Request was sent from a different origin/browser`, error: true }, true);
 
     const preSessionId = sanitize(xss(req.cookies.preSessionId));
 
     //check if browser origin and device is the same
     if (!a.preSessionId || a.preSessionId !== preSessionId) {
-        return errorWebResponse(res, { message: "invalid preSessionId cookie: Request was sent from a different origin/browser", error: true }, true);
+        return errorWebResponse(res, { message: `invalid preSessionId cookie: Request was sent from a different origin/browser`, error: true }, true);
     }
 
     //try to find user with email
-    let user = await db.get("user").findOne({
+    let user = await db.get(`user`).findOne({
         email: a.email
     });
 
     //create new user if dont exist
     if (!user) {
-        const userId = "u" + generateToken(14);
+        const userId = `u` + generateToken(14);
 
-        await db.get("user").insert({
+        await db.get(`user`).insert({
             userId,
             email: a.email,
             time: Date.now(),
-            ip: req.headers["x-forwarded-for"]
+            ip: req.headers[`x-forwarded-for`]
         });
         user = { userId };
     } else if (user.totpActive || user.webAuthnActive) {
@@ -134,69 +135,69 @@ app.get("/v1/createsession", async (req, res) => {
         const firstFactorToken = generateToken(100);
 
         //add firstFactorToken to db
-        await db.get("login").insert({
+        await db.get(`login`).insert({
             firstFactorToken,
             userId: user.userId,
             time: Date.now(),
-            ip: req.headers["x-forwarded-for"],
-            userAgent: req.headers["user-agent"] ? req.headers["user-agent"] : ""
+            ip: req.headers[`x-forwarded-for`],
+            userAgent: req.headers[`user-agent`] ? req.headers[`user-agent`] : ``
         });
 
         //append firstFactorToken cookie to response
-        res.cookie("firstFactorToken", firstFactorToken, {
+        res.cookie(`firstFactorToken`, firstFactorToken, {
             maxAge: 10000000,
             ...secureCookieAttributes
         });
 
-        if (user.totpActive && user.webAuthnActive) return res.redirect("/login/2fa");
-        if (user.totpActive) return res.redirect("/login/2fa/totp");
-        return res.redirect("/login/2fa/webauthn");
+        if (user.totpActive && user.webAuthnActive) return res.redirect(`/login/2fa`);
+        if (user.totpActive) return res.redirect(`/login/2fa/totp`);
+        return res.redirect(`/login/2fa/webauthn`);
     }
     //generate session id
     const newSessionID = generateToken(100);
 
     //save session cookie to db
-    await db.get("session").insert({
+    await db.get(`session`).insert({
         session: newSessionID,
         userId: user.userId,
         time: Date.now(),
-        ip: req.headers["x-forwarded-for"],
-        userAgent: req.headers["user-agent"] ? req.headers["user-agent"] : ""
+        ip: req.headers[`x-forwarded-for`],
+        userAgent: req.headers[`user-agent`] ? req.headers[`user-agent`] : ``
     });
 
     //append session cookie to response
-    res.cookie("session", newSessionID, {
+    res.cookie(`session`, newSessionID, {
         maxAge: 10000000000,
         ...secureCookieAttributes
     });
 
-    return res.redirect("/2fa");
+    return res.redirect(`/2fa`);
 });
 
 app.use((req, res, next) => {
     if (V) return next();
-    if (req.get(`Host`) === process.env.WEB_URI && req.get(`origin`) === webSchema + "://" + process.env.WEB_URI && req.is("application/json")) {
+    if (req.get(`Host`) === process.env.WEB_URI && req.get(`origin`) === webSchema + `://` + process.env.WEB_URI && req.is(`application/json`)) {
         return next();
     }
-    return res.send({ message: "Error", error: true });
+    return res.send({ message: `Error`, error: true });
 });
 
-app.post("/v1/login", async (req, res) => {
+app.post(`${BASE_URL}/v1/login`, async (req, res) => {
     if (
         !req.body ||
         !req.body.email ||
-        !req.body.email.match(/^(([^<>()\[\]\\.,;:\s@"]{1,64}(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".{1,62}"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]{1,63}\.)+[a-zA-Z]{2,63}))$/)
+        !req.body.email.match(/^(([^<>()\[\]\\.,;:\s@`]{1,64}(\.[^<>()\[\]\\.,;:\s@`]+)*)|(`.{1,62}`))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]{1,63}\.)+[a-zA-Z]{2,63}))$/)
     ) {
         return errorWebResponse(res, { message: `invalid mail`, error: true });
     }
     const email = sanitize(xss(req.body.email));
 
-    const a = await db.get("login").findOne({
+    const a = await db.get(`login`).findOne({
         email
     });
     const token = generateToken(100);
     const preSessionId = generateToken(100);
-    const link = `${webSchema}://${process.env.WEB_URI}/v1/createsession?t=${token}`;
+    const link = `${webSchema}://${process.env.WEB_URI}${BASE_URL}/v1/createsession?t=${token}`;
     if (a) {
         if (a.time + 1000 * 60 * process.env.REQUEST_NEW_MAGIC_LINK_MINUTES > Date.now()) {
             const wait = (a.time + 1000 * 60 * process.env.REQUEST_NEW_MAGIC_LINK_MINUTES - Date.now()) / 1000;
@@ -209,7 +210,7 @@ app.post("/v1/login", async (req, res) => {
                 true
             );
         }
-        db.get("login").findOneAndUpdate(
+        db.get(`login`).findOneAndUpdate(
             {
                 email
             },
@@ -217,17 +218,17 @@ app.post("/v1/login", async (req, res) => {
                 $set: {
                     time: Date.now(),
                     token,
-                    ip: req.headers["x-forwarded-for"],
+                    ip: req.headers[`x-forwarded-for`],
                     preSessionId
                 }
             }
         );
     } else {
-        db.get("login").insert({
+        db.get(`login`).insert({
             email,
             time: Date.now(),
             token,
-            ip: req.headers["x-forwarded-for"],
+            ip: req.headers[`x-forwarded-for`],
             preSessionId
         });
     }
@@ -259,36 +260,36 @@ app.post("/v1/login", async (req, res) => {
             html: `Someone requested a link to log into your account. If this was you: Click on the link to <a href="${link}"><b>Login</b></a> <p style="color:red;"> <b>Never share this link with anyone!</b></p>`
         },
         (error, info) => {
-            if (error) return res.send({ message: "Invalid email", error: true });
+            if (error) return res.send({ message: `Invalid email`, error: true });
 
-            res.cookie("preSessionId", preSessionId, {
+            res.cookie(`preSessionId`, preSessionId, {
                 maxAge: 10000000,
                 ...secureCookieAttributes
             });
-            res.cookie("session", "", {
+            res.cookie(`session`, ``, {
                 maxAge: 1,
                 ...secureCookieAttributes
             });
-            res.cookie("firstFactorToken", "", {
+            res.cookie(`firstFactorToken`, ``, {
                 maxAge: 1,
                 ...secureCookieAttributes
             });
-            return errorWebResponse(res, { message: "Success", error: false }, true);
+            return errorWebResponse(res, { message: `Success`, error: false }, true);
         }
     );
 });
 
-app.post("/v1/2fa/totp/generate", async (req, res) => {
+app.post(`${BASE_URL}/v1/2fa/totp/generate`, async (req, res) => {
     const a = await checkSession(req);
-    if (!a) return errorWebResponse(res, { message: "invalid session", error: true }, true);
+    if (!a) return errorWebResponse(res, { message: `invalid session`, error: true }, true);
     if (a.totpActive) {
-        if (!req.body || !req.body.replace || req.body.replace !== "true") {
-            return errorWebResponse(res, { message: "totp already activated; send the body {replace:true} to override", error: true, warning: "token is present" }, true);
+        if (!req.body || !req.body.replace || req.body.replace !== `true`) {
+            return errorWebResponse(res, { message: `totp already activated; send the body {replace:true} to override`, error: true, warning: `token is present` }, true);
         }
     }
     const secret = authenticator.generateSecret();
     const otpauth = authenticator.keyuri(a.userId, process.env.WEB_URI, secret);
-    db.collection("user").findOneAndUpdate(
+    db.collection(`user`).findOneAndUpdate(
         {
             _id: a._id
         },
@@ -307,13 +308,13 @@ app.post("/v1/2fa/totp/generate", async (req, res) => {
     });
 });
 
-app.post("/v1/2fa/totp/register", async (req, res) => {
+app.post(`${BASE_URL}/v1/2fa/totp/register`, async (req, res) => {
     const a = await checkSession(req);
-    if (!a) return errorWebResponse(res, { message: "invalid session token", error: true }, true);
-    if (!req.body) return errorWebResponse(res, { message: "missing body", error: true });
-    if (!req.body.totp) return errorWebResponse(res, { message: "totp token missing", error: true });
+    if (!a) return errorWebResponse(res, { message: `invalid session token`, error: true }, true);
+    if (!req.body) return errorWebResponse(res, { message: `missing body`, error: true });
+    if (!req.body.totp) return errorWebResponse(res, { message: `totp token missing`, error: true });
     if (authenticator.generate(a.totpSecret) === req.body.totp) {
-        await db.collection("user").findOneAndUpdate(
+        await db.collection(`user`).findOneAndUpdate(
             {
                 _id: a._id
             },
@@ -323,21 +324,21 @@ app.post("/v1/2fa/totp/register", async (req, res) => {
                 }
             }
         );
-        return errorWebResponse(res, { message: "correct totp token", error: false }, true);
+        return errorWebResponse(res, { message: `correct totp token`, error: false }, true);
     }
-    return errorWebResponse(res, { message: "invalid totp token", error: true }, true);
+    return errorWebResponse(res, { message: `invalid totp token`, error: true }, true);
 });
 
-app.post("/v1/2fa/webauthn/register/request", async (req, res) => {
+app.post(`${BASE_URL}/v1/2fa/webauthn/register/request`, async (req, res) => {
     const user = await checkSession(req);
-    if (!user) return errorWebResponse(res, { message: "invalid session token", error: true }, true);
+    if (!user) return errorWebResponse(res, { message: `invalid session token`, error: true }, true);
 
     const challengeResponse = generateRegistrationChallenge({
         relyingParty: { name: process.env.DISPLAY_NAME },
         user: { id: user.userId, name: user.userId }
     });
 
-    db.collection("user").findOneAndUpdate(
+    db.collection(`user`).findOneAndUpdate(
         {
             _id: user._id
         },
@@ -351,15 +352,15 @@ app.post("/v1/2fa/webauthn/register/request", async (req, res) => {
     return res.send(challengeResponse);
 });
 
-app.post("/v1/2fa/webauthn/register/verify", async (req, res) => {
+app.post(`${BASE_URL}/v1/2fa/webauthn/register/verify`, async (req, res) => {
     const user = await checkSession(req);
-    if (!user) return errorWebResponse(res, { message: "invalid session token", error: true }, true);
+    if (!user) return errorWebResponse(res, { message: `invalid session token`, error: true }, true);
 
     const { key, challenge } = parseRegisterRequest(req.body);
-    db.collection("user").findOne({ webAuthnRegisterChallenge: challenge });
+    db.collection(`user`).findOne({ webAuthnRegisterChallenge: challenge });
 
     if (db.collection.length) {
-        db.collection("user").findOneAndUpdate(
+        db.collection(`user`).findOneAndUpdate(
             {
                 _id: user._id
             },
@@ -371,63 +372,63 @@ app.post("/v1/2fa/webauthn/register/verify", async (req, res) => {
                 }
             }
         );
-        return errorWebResponse(res, { message: "Success", error: false }, true);
+        return errorWebResponse(res, { message: `Success`, error: false }, true);
     }
-    return errorWebResponse(res, { message: "WebAuthn challenge failed", error: true }, true);
+    return errorWebResponse(res, { message: `WebAuthn challenge failed`, error: true }, true);
 });
 
-app.post("/v1/createsession/2fa/totp", async (req, res) => {
-    if (!req.cookies) return errorWebResponse(res, { message: "missing cookies", error: true });
-    if (!req.cookies.firstFactorToken) return errorWebResponse(res, { message: "missing firstFactorToken cookie", error: true });
-    if (!req.body) return errorWebResponse(res, { message: "missing body", error: true });
-    if (!req.body.totp) return errorWebResponse(res, { message: "missing totp object in body", error: true });
+app.post(`${BASE_URL}/v1/createsession/2fa/totp`, async (req, res) => {
+    if (!req.cookies) return errorWebResponse(res, { message: `missing cookies`, error: true });
+    if (!req.cookies.firstFactorToken) return errorWebResponse(res, { message: `missing firstFactorToken cookie`, error: true });
+    if (!req.body) return errorWebResponse(res, { message: `missing body`, error: true });
+    if (!req.body.totp) return errorWebResponse(res, { message: `missing totp object in body`, error: true });
 
-    const login = await db.get("login").findOne({ firstFactorToken: req.cookies.firstFactorToken });
-    if (!login) return errorWebResponse(res, { message: "invalid firstFactorToken", error: true });
+    const login = await db.get(`login`).findOne({ firstFactorToken: req.cookies.firstFactorToken });
+    if (!login) return errorWebResponse(res, { message: `invalid firstFactorToken`, error: true });
 
-    const user = await db.get("user").findOne({ userId: login.userId });
+    const user = await db.get(`user`).findOne({ userId: login.userId });
     if (authenticator.generate(user.totpSecret) === req.body.totp) {
         //generate session id
         const newSessionID = generateToken(100);
 
         //save session cookie to db
-        await db.get("session").insert({
+        await db.get(`session`).insert({
             session: newSessionID,
             userId: user.userId,
             time: Date.now(),
-            ip: req.headers["x-forwarded-for"],
-            userAgent: req.headers["user-agent"] ? req.headers["user-agent"] : ""
+            ip: req.headers[`x-forwarded-for`],
+            userAgent: req.headers[`user-agent`] ? req.headers[`user-agent`] : ``
         });
 
         //append session cookie to response
-        res.cookie("session", newSessionID, {
+        res.cookie(`session`, newSessionID, {
             maxAge: 10000000000,
             ...secureCookieAttributes
         });
-        res.cookie("firstFactorToken", "", {
+        res.cookie(`firstFactorToken`, ``, {
             maxAge: 1,
             ...secureCookieAttributes
         });
 
-        return errorWebResponse(res, { message: "Success", error: false }, true);
+        return errorWebResponse(res, { message: `Success`, error: false }, true);
     }
-    return errorWebResponse(res, { message: "invalid totp", error: true }, true);
+    return errorWebResponse(res, { message: `invalid totp`, error: true }, true);
 });
 
-app.post("/v1/createsession/2fa/webauthn/request", async (req, res) => {
-    if (!req.cookies) return errorWebResponse(res, { message: "missing cookies", error: true });
-    if (!req.cookies.firstFactorToken) return errorWebResponse(res, { message: "missing firstFactorToken cookie", error: true });
+app.post(`${BASE_URL}/v1/createsession/2fa/webauthn/request`, async (req, res) => {
+    if (!req.cookies) return errorWebResponse(res, { message: `missing cookies`, error: true });
+    if (!req.cookies.firstFactorToken) return errorWebResponse(res, { message: `missing firstFactorToken cookie`, error: true });
     const fft = sanitize(xss(req.cookies.firstFactorToken));
 
-    const login = await db.get("login").findOne({ firstFactorToken: fft });
+    const login = await db.get(`login`).findOne({ firstFactorToken: fft });
 
-    if (!login) return errorWebResponse(res, { message: "invalid firstFactorToken", error: true });
-    const user = await db.get("user").findOne({ userId: login.userId });
-    if (!user) return errorWebResponse(res, { message: "user not found", error: true });
-    if (!user.webAuthnKey) return errorWebResponse(res, { message: "missing public key for this user", error: true });
+    if (!login) return errorWebResponse(res, { message: `invalid firstFactorToken`, error: true });
+    const user = await db.get(`user`).findOne({ userId: login.userId });
+    if (!user) return errorWebResponse(res, { message: `user not found`, error: true });
+    if (!user.webAuthnKey) return errorWebResponse(res, { message: `missing public key for this user`, error: true });
 
     const newChallenge = generateLoginChallenge(user.webAuthnKey);
-    db.collection("login").findOneAndUpdate(
+    db.collection(`login`).findOneAndUpdate(
         {
             _id: login._id
         },
@@ -437,67 +438,67 @@ app.post("/v1/createsession/2fa/webauthn/request", async (req, res) => {
             }
         }
     );
-    newChallenge.userVerification = "preferred";
+    newChallenge.userVerification = `preferred`;
     res.send(newChallenge);
 });
-app.post("/v1/createsession/2fa/webauthn/verify", async (req, res) => {
-    if (!req.cookies) return errorWebResponse(res, { message: "missing cookies", error: true });
-    if (!req.cookies.firstFactorToken) return errorWebResponse(res, { message: "missing firstFactorToken cookie", error: true });
-    if (!req.body) return errorWebResponse(res, { message: "missing body", error: true });
-    const login = await db.get("login").findOne({ firstFactorToken: req.cookies.firstFactorToken });
-    if (!login) return errorWebResponse(res, { message: "invalid firstFactorToken", error: true });
-    const user = await db.get("user").findOne({ userId: login.userId });
-    if (!user) return errorWebResponse(res, { message: "user not found", error: true });
-    if (!user.webAuthnKey) return errorWebResponse(res, { message: "missing public key for this user", error: true });
+app.post(`${BASE_URL}/v1/createsession/2fa/webauthn/verify`, async (req, res) => {
+    if (!req.cookies) return errorWebResponse(res, { message: `missing cookies`, error: true });
+    if (!req.cookies.firstFactorToken) return errorWebResponse(res, { message: `missing firstFactorToken cookie`, error: true });
+    if (!req.body) return errorWebResponse(res, { message: `missing body`, error: true });
+    const login = await db.get(`login`).findOne({ firstFactorToken: req.cookies.firstFactorToken });
+    if (!login) return errorWebResponse(res, { message: `invalid firstFactorToken`, error: true });
+    const user = await db.get(`user`).findOne({ userId: login.userId });
+    if (!user) return errorWebResponse(res, { message: `user not found`, error: true });
+    if (!user.webAuthnKey) return errorWebResponse(res, { message: `missing public key for this user`, error: true });
 
     const { challenge, keyId } = parseLoginRequest(req.body);
 
-    if (!challenge) return errorWebResponse(res, { message: "missing challenge", error: true });
-    if (user.webAuthnKey.credID !== keyId) return errorWebResponse(res, { message: "invalid webAuthnKey", error: true });
-    if (login.webAuthnLoginChallenge !== challenge) return errorWebResponse(res, { message: "invalid challenge", error: true });
+    if (!challenge) return errorWebResponse(res, { message: `missing challenge`, error: true });
+    if (user.webAuthnKey.credID !== keyId) return errorWebResponse(res, { message: `invalid webAuthnKey`, error: true });
+    if (login.webAuthnLoginChallenge !== challenge) return errorWebResponse(res, { message: `invalid challenge`, error: true });
     //solvedChallenge === login.webAuthnLoginChallenge
     if (verifyAuthenticatorAssertion(req.body, user.webAuthnKey)) {
         //generate session id
         const newSessionID = generateToken(100);
 
         //save session cookie to db
-        await db.get("session").insert({
+        await db.get(`session`).insert({
             session: newSessionID,
             userId: user.userId,
             time: Date.now(),
-            ip: req.headers["x-forwarded-for"],
-            userAgent: req.headers["user-agent"] ? req.headers["user-agent"] : ""
+            ip: req.headers[`x-forwarded-for`],
+            userAgent: req.headers[`user-agent`] ? req.headers[`user-agent`] : ``
         });
 
         //append session cookie to response
-        res.cookie("session", newSessionID, {
+        res.cookie(`session`, newSessionID, {
             maxAge: 10000000000,
             ...secureCookieAttributes
         });
-        res.cookie("firstFactorToken", "", {
+        res.cookie(`firstFactorToken`, ``, {
             maxAge: 1,
             ...secureCookieAttributes
         });
 
-        return errorWebResponse(res, { message: "success", error: false }, true);
+        return errorWebResponse(res, { message: `success`, error: false }, true);
     }
-    return errorWebResponse(res, { message: "WebAuthn challenge failed", error: true }, true);
+    return errorWebResponse(res, { message: `WebAuthn challenge failed`, error: true }, true);
 });
 
-app.get("*", (req, res) => {
+app.get(`*`, (req, res) => {
     res.sendStatus(400);
 });
-app.post("*", (req, res) => {
+app.post(`*`, (req, res) => {
     res.sendStatus(400);
 });
 
 const checkSession = async req => {
     const sessionCookie = sanitize(xss(req.cookies.session));
-    const session = await db.get("session").findOne({
+    const session = await db.get(`session`).findOne({
         session: sessionCookie
     });
     if (!session) return false;
-    const user = await db.get("user").findOne({
+    const user = await db.get(`user`).findOne({
         userId: session.userId
     });
     if (!user) return false;
@@ -505,5 +506,5 @@ const checkSession = async req => {
 };
 
 const generateToken = length => {
-    return cryptoRandomString({ length, characters: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-" });
+    return cryptoRandomString({ length, characters: `ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-` });
 };
