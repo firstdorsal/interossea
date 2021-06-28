@@ -1,4 +1,4 @@
-FROM node:14.15.4-slim
+FROM node:lts-alpine3.13
 WORKDIR /akkount/
 COPY index.js .
 COPY package.json .

@@ -5,7 +5,7 @@ html(lang="en")
     body 
         main 
             h1 Login
-            section#form.hidden
+            section#form
                 div No classic registration required! 
                 | Upon entering your E-Mail we will send you a link to login.
                 div.emailInput
@@ -16,8 +16,8 @@ html(lang="en")
             section#waiting.hidden
                 div.lds-dual-ring
                 div Please wait...
-            section#success
+            section#success.hidden
                 h1 Success!
                 div A link was sent to your E-Mail. Please open it on the same browser/device. The mail delivery may take a moment. Don't forget to check your spam folder.
-            //include /modules/footer.pug
+        include /modules/footer.pug
         script(src="script.js") 

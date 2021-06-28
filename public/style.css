@@ -35,20 +35,20 @@ html {
     height: 100%;
 }
 
+body {
+    margin: auto;
+    text-align: left;
+    width: 50%;
+    max-width: 450px;
+    min-width: 300px;
+}
+
 b {
     font-weight: 600;
 }
 div,
 section {
     padding: 5px 0px;
-}
-
-main {
-    margin: auto;
-    text-align: left;
-    width: 50%;
-    max-width: 450px;
-    min-width: 300px;
 }
 
 a {
