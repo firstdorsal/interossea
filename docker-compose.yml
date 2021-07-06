@@ -7,11 +7,11 @@ services:
         restart: always
     akkount:
         container_name: akkount
-        image: node
+        image: node:lts-alpine3.13
         restart: always
         ports:
-            - 127.0.0.1:3001:80
+            - 127.0.0.1:3000:80
         working_dir: /home/node/app
         volumes:
-            - ./akkount:/home/node/app
-        command: "npm start"
+            - ./:/home/node/app
+        command: "yarn start"
