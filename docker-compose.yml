@@ -5,8 +5,8 @@ services:
         image: mongo
         container_name: db
         restart: always
-    akkount:
-        container_name: akkount
+    interossea:
+        container_name: interossea
         image: node:lts-alpine3.13
         restart: always
         ports:

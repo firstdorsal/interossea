@@ -35,7 +35,7 @@ console.log(`server started on port ${WEBSCHEMA}://${WEB_URL}:${PORT}`);
 const DEBUG = process.env.DEBUG !== undefined ? process.env.DEBUG : false;
 console.log(`debug mode set to ${DEBUG}. ${DEBUG ? `DONT USE IN PRODUCTION` : ``}`);
 const SECURE_COOKIE_ATTRIBUTES = { path: `/`, httpOnly: true, secure: true, sameSite: `Strict` };
-const BASE_URL = `/akkount`;
+const BASE_URL = `/interossea`;
 
 const REQUEST_NEW_MAGIC_LINK_MINUTES = process.env.REQUEST_NEW_MAGIC_LINK_MINUTES !== undefined ? process.env.REQUEST_NEW_MAGIC_LINK_MINUTES : 0.5;
 

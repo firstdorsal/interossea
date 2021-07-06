@@ -31,7 +31,7 @@ const f = async (path, jsonData) => {
 const login = async () => {
     $("form").classList.add("hidden");
     $("waiting").classList.remove("hidden");
-    const req = await f("/akkount/v1/login", { email: ei.value });
+    const req = await f("/interossea/v1/login", { email: ei.value });
     if (req.message === "Success") {
         $("waiting").classList.add("hidden");
         $("success").classList.remove("hidden");
