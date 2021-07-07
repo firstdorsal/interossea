@@ -10,12 +10,11 @@ const rateLimit = require(`express-rate-limit`);
 const path = require(`path`);
 
 const app = express();
-app.use(cookieParser());
-app.use(compression());
-app.use(bodyParser.json({ limit: `10kb` }));
+
 const nodemailer = require(`nodemailer`);
 
 const DB_URI = process.env.DB_URI !== undefined ? process.env.DB_URI : `db`;
+
 const db = require(`monk`)(DB_URI, {
     useUnifiedTopology: true
 });
@@ -46,7 +45,10 @@ const IP_REQUEST_TIME_MINUTES = process.env.IP_REQUEST_TIME_MINUTES !== undefine
 const IP_REQUEST_PER_TIME = process.env.IP_REQUEST_PER_TIME !== undefined ? process.env.IP_REQUEST_PER_TIME : 100;
 
 // set express settings
-app.listen(PORT);
+const server = app.listen(PORT);
+app.use(cookieParser());
+app.use(compression());
+app.use(bodyParser.json({ limit: `10kb` }));
 app.use(helmet.hidePoweredBy());
 app.disable(`etag`);
 app.use(express.static(`public`));
@@ -188,7 +190,7 @@ app.use((req, res, next) => {
     if (req.get(`Host`) === WEB_URL && req.get(`origin`) === WEBSCHEMA + `://` + WEB_URL && req.is(`application/json`)) {
         return next();
     }
-    return res.send({ message: `Error`, error: true });
+    return res.send({ message: `Invalid location and/or type`, error: true });
 });
 
 // send link to login
@@ -203,6 +205,7 @@ app.post(`${BASE_URL}/v1/login`, async (req, res) => {
     const a = await db.get(`login`).findOne({
         email
     });
+
     const token = generateToken(100);
     const preSessionId = generateToken(100);
     const link = `${WEBSCHEMA}://${WEB_URL}${BASE_URL}/v1/createsession?t=${token}`;
@@ -254,37 +257,36 @@ app.post(`${BASE_URL}/v1/login`, async (req, res) => {
         }
     });
 
-    transporter.sendMail(
-        {
-            headers: {
-                "User-Agent": process.env.MAIL_AGENT,
-                "X-Mailer": process.env.MAIL_AGENT,
-                "Reply-To": process.env.REPLY_TO
-            },
-            from: `"${process.env.FROM_NAME}" <${process.env.FROM_MAIL_ADDRESS}>`,
-            to: req.body.email,
-            subject: process.env.FROM_NAME,
-            text: `Someone requested a link to log into your account. If this was you: Open this link in your browser ${link} Never share this link with anyone!`,
-            html: `Someone requested a link to log into your account. If this was you: Click on the link to <a href="${link}"><b>Login</b></a> <p style="color:red;"> <b>Never share this link with anyone!</b></p>`
+    const { info, error } = await transporter.sendMail({
+        headers: {
+            "User-Agent": process.env.MAIL_AGENT,
+            "X-Mailer": process.env.MAIL_AGENT,
+            "Reply-To": process.env.REPLY_TO
         },
-        (error, info) => {
-            if (error) return res.send({ message: `Invalid email`, error: true });
+        from: `"${process.env.FROM_NAME}" <${process.env.FROM_MAIL_ADDRESS}>`,
+        to: req.body.email,
+        subject: process.env.FROM_NAME,
+        text: `Someone requested a link to log into your account. If this was you: Open this link in your browser ${link} Never share this link with anyone!`,
+        html: `Someone requested a link to log into your account. If this was you: Click on the link to <a href="${link}"><b>Login</b></a> <p style="color:red;"> <b>Never share this link with anyone!</b></p>`
+    });
 
-            res.cookie(`preSessionId`, preSessionId, {
-                maxAge: 10000000,
-                ...SECURE_COOKIE_ATTRIBUTES
-            });
-            res.cookie(`session`, ``, {
-                maxAge: 1,
-                ...SECURE_COOKIE_ATTRIBUTES
-            });
-            res.cookie(`firstFactorToken`, ``, {
-                maxAge: 1,
-                ...SECURE_COOKIE_ATTRIBUTES
-            });
-            return errorWebResponse(res, { message: `Success`, error: false }, true);
-        }
-    );
+    if (error) return res.send({ message: `Could not send email`, error: true });
+
+    console.log(error, info);
+
+    res.cookie(`preSessionId`, preSessionId, {
+        maxAge: 10000000,
+        ...SECURE_COOKIE_ATTRIBUTES
+    });
+    res.cookie(`session`, ``, {
+        maxAge: 1,
+        ...SECURE_COOKIE_ATTRIBUTES
+    });
+    res.cookie(`firstFactorToken`, ``, {
+        maxAge: 1,
+        ...SECURE_COOKIE_ATTRIBUTES
+    });
+    return errorWebResponse(res, { message: `Success`, error: false }, true);
 });
 
 // two factor authentication
@@ -551,7 +553,12 @@ const generateToken = length => {
 // create a debug or default web response
 const errorWebResponse = (res, responseObject, overrideDebug = false) => {
     if (overrideDebug || DEBUG) {
-        return res.send(responseObject);
+        return res
+            .type("application/json")
+            .status(responseObject.error ? 400 : 200)
+            .send(responseObject);
     }
-    return res.send({ message: `Error`, error: true });
+    return res.type("application/json").status(400).send({ message: `Error`, error: true });
 };
+
+module.exports = { app, BASE_URL, server };
