@@ -186,6 +186,7 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
 });
 
 app.use((req, res, next) => {
+    res.type("application/json");
     if (DEBUG) return next();
     if (req.get(`Host`) === WEB_URL && req.get(`origin`) === WEBSCHEMA + `://` + WEB_URL && req.is(`application/json`)) {
         return next();
