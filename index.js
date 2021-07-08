@@ -15,11 +15,15 @@ const nodemailer = require(`nodemailer`);
 
 const DB_URI = process.env.DB_URI !== undefined ? process.env.DB_URI : `db`;
 
-const db = require(`monk`)(DB_URI, {
-    useUnifiedTopology: true
+const { Client } = require(`pg`);
+const db = new Client({
+    user: "postgres",
+    host: DB_URI,
+    password: "password"
 });
+db.connect();
+db.query("CREATE DATABASE db").catch(e => {});
 
-const sanitize = require(`mongo-sanitize`);
 const xss = require(`xss`);
 const qrcode = require(`qrcode`);
 const { generateRegistrationChallenge, parseRegisterRequest, parseLoginRequest, generateLoginChallenge, verifyAuthenticatorAssertion } = require(`@webauthn/server`);
@@ -91,7 +95,7 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
     if (!req.query.t) return errorWebResponse(res, { message: `no login token present`, error: true });
 
     // sanitize the token
-    const t = sanitize(xss(req.query.t));
+    const t = xss(req.query.t);
 
     // find corresponding email for token
     const a = await db.get(`login`).findOne({
@@ -117,7 +121,7 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
 
     if (!req.cookies.preSessionId) return errorWebResponse(res, { message: `missing preSessionId cookie: Request was sent from a different origin/browser`, error: true }, true);
 
-    const preSessionId = sanitize(xss(req.cookies.preSessionId));
+    const preSessionId = xss(req.cookies.preSessionId);
 
     // check if browser origin and device is the same
     if (!a.preSessionId || a.preSessionId !== preSessionId) {
@@ -201,7 +205,7 @@ app.post(`${BASE_URL}/v1/login`, async (req, res) => {
     if (!req.body || !req.body.email || !req.body.email.match(emailRegex)) {
         return errorWebResponse(res, { message: `invalid mail`, error: true });
     }
-    const email = sanitize(xss(req.body.email));
+    const email = xss(req.body.email);
 
     const a = await db.get(`login`).findOne({
         email
@@ -430,7 +434,7 @@ app.post(`${BASE_URL}/v1/createsession/2fa/totp`, async (req, res) => {
 app.post(`${BASE_URL}/v1/createsession/2fa/webauthn/request`, async (req, res) => {
     if (!req.cookies) return errorWebResponse(res, { message: `missing cookies`, error: true });
     if (!req.cookies.firstFactorToken) return errorWebResponse(res, { message: `missing firstFactorToken cookie`, error: true });
-    const fft = sanitize(xss(req.cookies.firstFactorToken));
+    const fft = xss(req.cookies.firstFactorToken);
 
     const login = await db.get(`login`).findOne({ firstFactorToken: fft });
 
@@ -500,7 +504,7 @@ app.post(`${BASE_URL}/v1/createsession/2fa/webauthn/verify`, async (req, res) =>
 app.post(`${BASE_URL}/v1/logout`, async (req, res) => {
     if (!req.cookies || !req.cookies.session) return errorWebResponse(res, { message: `missing cookies`, error: true });
 
-    const sessionCookie = sanitize(xss(req.cookies.session));
+    const sessionCookie = xss(req.cookies.session);
     await db.get(`session`).findOneAndDelete({ session: sessionCookie });
 
     res.cookie(`session`, ``, {
@@ -534,7 +538,7 @@ app.post(`*`, (req, res) => {
 
 // check session token
 const checkSession = async req => {
-    const sessionCookie = sanitize(xss(req.cookies.session));
+    const sessionCookie = xss(req.cookies.session);
     const session = await db.get(`session`).findOne({
         session: sessionCookie
     });

@@ -2,7 +2,7 @@ version: "3.7"
 
 services:
     db:
-        image: mongo
+        image: postgres:alpine
         container_name: db
         restart: always
     interossea:

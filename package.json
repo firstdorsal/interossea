@@ -5,7 +5,7 @@
     "main": "index.js",
     "scripts": {
         "start": "node index.js",
-        "test": "docker-compose -f mongo-compose.yml up -d; jest --forceExit; docker-compose -f mongo-compose.yml down"
+        "test": "bash test.sh"
     },
     "repository": {
         "type": "git",
@@ -33,6 +33,7 @@
         "monk": "^7.3.2",
         "nodemailer": "^6.4.11",
         "otplib": "^12.0.1",
+        "pg": "^8.6.0",
         "pug": "^3.0.2",
         "qrcode": "^1.4.4",
         "randomstring": "^1.1.5",
