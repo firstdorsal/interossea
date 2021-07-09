@@ -1,4 +1,6 @@
 `use strict`;
+
+const emailRegex = /^(([^<>()\[\]\\.,;:\s@`]{1,64}(\.[^<>()\[\]\\.,;:\s@`]+)*)|(`.{1,62}`))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]{1,63}\.)+[a-zA-Z]{2,63}))$/;
 require(`dotenv`).config();
 const express = require(`express`);
 const cookieParser = require(`cookie-parser`);
@@ -14,15 +16,49 @@ const app = express();
 const nodemailer = require(`nodemailer`);
 
 const DB_URI = process.env.DB_URI !== undefined ? process.env.DB_URI : `db`;
-
+require("./lib/initPg")(DB_URI);
 const { Client } = require(`pg`);
+
 const db = new Client({
     user: "postgres",
     host: DB_URI,
-    password: "password"
+    password: "password",
+    database: "db"
 });
 db.connect();
-db.query("CREATE DATABASE db").catch(e => {});
+
+db.query(
+    `
+    CREATE TABLE login (
+            email varchar(254) NOT NULL UNIQUE,
+            time bigint NOT NULL,
+            token varchar(100) NOT NULL,
+            ip varchar(50) NOT NULL,
+            preSessionId varchar(100) NOT NULL,
+            PRIMARY KEY (email)
+        );
+    CREATE TABLE login2 (
+        firstFactorToken varchar(100) NOT NULL UNIQUE,
+        userId varchar(15) NOT NULL,
+        time bigint NOT NULL,
+        ip varchar(50) NOT NULL,
+        PRIMARY KEY (firstFactorToken)
+    );
+    CREATE TABLE users (
+        email varchar(254) NOT NULL UNIQUE,
+        userId varchar(15) NOT NULL UNIQUE,
+        time bigint NOT NULL,
+        PRIMARY KEY (userId)
+    );
+    CREATE TABLE sessions (
+        sessionId varchar(100) NOT NULL UNIQUE,
+        userId varchar(15) NOT NULL,
+        time bigint NOT NULL,
+        ip varchar(50) NOT NULL,
+        PRIMARY KEY (sessionId)
+    );  
+    `
+).catch(() => {});
 
 const xss = require(`xss`);
 const qrcode = require(`qrcode`);
@@ -57,6 +93,7 @@ app.use(helmet.hidePoweredBy());
 app.disable(`etag`);
 app.use(express.static(`public`));
 app.set(`view engine`, `pug`);
+app.set("trust proxy", true);
 app.locals.basedir = path.join(__dirname, `views`);
 
 // apply rate limiting to login
@@ -80,7 +117,7 @@ if (!process.env.DISABLE_FRONTEND) {
 
 // handle clicked link
 app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
-    res.cookie(`session`, ``, {
+    res.cookie(`sessionId`, ``, {
         maxAge: 1,
         ...SECURE_COOKIE_ATTRIBUTES
     });
@@ -97,23 +134,21 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
     // sanitize the token
     const t = xss(req.query.t);
 
-    // find corresponding email for token
-    const a = await db.get(`login`).findOne({
-        token: t
-    });
-    // delete login
-    await db.get(`login`).findOneAndDelete({
-        token: t
-    });
-    // check if token exists and hasnt expired
-    if (!a) return errorWebResponse(res, { message: `Invalid login token`, error: true }, true);
+    // find corresponding email for token t
+    const a = (await db.query(`SELECT * FROM login WHERE token=$1`, [t])).rows[0];
 
+    // delete login
+    await db.query(`DELETE FROM login WHERE token=$1`, [t]);
+
+    // check if token exists and hasnt expired
+    const ip = req.ip;
+    if (!a) return errorWebResponse(res, { message: `Invalid login token`, error: true }, true);
     if (!a.time || a.time + 1000 * 60 * MAGIC_LINK_EXPIRE_MINUTES < Date.now()) {
         return errorWebResponse(res, { message: `Expired login token`, error: true }, true);
     }
     // check if ip requesting the token is the same as ip trying to start a session with it
     if (!DEBUG) {
-        if (!a.ip || a.ip !== req.headers[`x-forwarded-for`]) {
+        if (!a.ip || a.ip !== ip) {
             return errorWebResponse(res, { message: `Request was sent from a different IP`, error: true }, true);
         }
     }
@@ -129,20 +164,13 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
     }
 
     // try to find user with email
-    let user = await db.get(`user`).findOne({
-        email: a.email
-    });
+    let user = (await db.query(`SELECT * FROM users WHERE email=$1`, [a.email])).rows[0];
 
     // create new user if dont exist
     if (!user) {
-        const userId = `u` + generateToken(14);
+        const userId = `u${generateToken(14)}`;
 
-        await db.get(`user`).insert({
-            userId,
-            email: a.email,
-            time: Date.now(),
-            ip: req.headers[`x-forwarded-for`]
-        });
+        await db.query(`INSERT INTO users (email, userId, time) VALUES ($1, $2, $3)`, [a.email, userId, Date.now()]);
         user = { userId };
     } else if (user.totpActive || user.webAuthnActive) {
         // check if 2fa is present
@@ -150,13 +178,7 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
         const firstFactorToken = generateToken(100);
 
         // add firstFactorToken to db
-        await db.get(`login`).insert({
-            firstFactorToken,
-            userId: user.userId,
-            time: Date.now(),
-            ip: req.headers[`x-forwarded-for`],
-            userAgent: req.headers[`user-agent`] ? req.headers[`user-agent`] : ``
-        });
+        await db.query(`INSERT INTO login2 (firstFactorToken, userId, time, ip) VALUES ($1, $2, $3, $4)`, [firstFactorToken, userId, Date.now(), ip]);
 
         // append firstFactorToken cookie to response
         res.cookie(`firstFactorToken`, firstFactorToken, {
@@ -172,21 +194,15 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
     const newSessionID = generateToken(100);
 
     // save session cookie to db
-    await db.get(`session`).insert({
-        session: newSessionID,
-        userId: user.userId,
-        time: Date.now(),
-        ip: req.headers[`x-forwarded-for`],
-        userAgent: req.headers[`user-agent`] ? req.headers[`user-agent`] : ``
-    });
+    await db.query(`INSERT INTO sessions (sessionId, userId, time, ip) VALUES ($1, $2, $3, $4)`, [newSessionID, user.userId, Date.now(), ip]);
 
     // append session cookie to response
-    res.cookie(`session`, newSessionID, {
+    res.cookie(`sessionId`, newSessionID, {
         maxAge: 10000000000,
         ...SECURE_COOKIE_ATTRIBUTES
     });
 
-    return res.redirect(`/2fa`);
+    return res.redirect(`${BASE_URL}/2fa`);
 });
 
 app.use((req, res, next) => {
@@ -200,20 +216,16 @@ app.use((req, res, next) => {
 
 // send link to login
 app.post(`${BASE_URL}/v1/login`, async (req, res) => {
-    const emailRegex = /^(([^<>()\[\]\\.,;:\s@`]{1,64}(\.[^<>()\[\]\\.,;:\s@`]+)*)|(`.{1,62}`))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]{1,63}\.)+[a-zA-Z]{2,63}))$/;
-
     if (!req.body || !req.body.email || !req.body.email.match(emailRegex)) {
         return errorWebResponse(res, { message: `invalid mail`, error: true });
     }
     const email = xss(req.body.email);
-
-    const a = await db.get(`login`).findOne({
-        email
-    });
+    const a = (await db.query(`SELECT * FROM login WHERE email=$1`, [email])).rows[0];
 
     const token = generateToken(100);
     const preSessionId = generateToken(100);
     const link = `${WEBSCHEMA}://${WEB_URL}${BASE_URL}/v1/createsession?t=${token}`;
+    const ip = req.ip;
     if (a) {
         if (a.time + 1000 * 60 * REQUEST_NEW_MAGIC_LINK_MINUTES > Date.now()) {
             const wait = (a.time + 1000 * 60 * REQUEST_NEW_MAGIC_LINK_MINUTES - Date.now()) / 1000;
@@ -226,27 +238,9 @@ app.post(`${BASE_URL}/v1/login`, async (req, res) => {
                 true
             );
         }
-        db.get(`login`).findOneAndUpdate(
-            {
-                email
-            },
-            {
-                $set: {
-                    time: Date.now(),
-                    token,
-                    ip: req.headers[`x-forwarded-for`],
-                    preSessionId
-                }
-            }
-        );
+        db.query("UPDATE login SET time=$2, token=$3, ip=$4, preSessionId=$5 WHERE email=$1", [email, Date.now(), token, ip, preSessionId]);
     } else {
-        db.get(`login`).insert({
-            email,
-            time: Date.now(),
-            token,
-            ip: req.headers[`x-forwarded-for`],
-            preSessionId
-        });
+        db.query("INSERT INTO login (email,time,token,ip,preSessionId) VALUES ($1,$2,$3,$4,$5)", [email, Date.now(), token, ip, preSessionId]);
     }
 
     const transporter = nodemailer.createTransport({
@@ -262,7 +256,7 @@ app.post(`${BASE_URL}/v1/login`, async (req, res) => {
         }
     });
 
-    const { info, error } = await transporter.sendMail({
+    const { error } = await transporter.sendMail({
         headers: {
             "User-Agent": process.env.MAIL_AGENT,
             "X-Mailer": process.env.MAIL_AGENT,
@@ -277,13 +271,11 @@ app.post(`${BASE_URL}/v1/login`, async (req, res) => {
 
     if (error) return res.send({ message: `Could not send email`, error: true });
 
-    console.log(error, info);
-
     res.cookie(`preSessionId`, preSessionId, {
         maxAge: 10000000,
         ...SECURE_COOKIE_ATTRIBUTES
     });
-    res.cookie(`session`, ``, {
+    res.cookie(`sessionId`, ``, {
         maxAge: 1,
         ...SECURE_COOKIE_ATTRIBUTES
     });
@@ -300,7 +292,7 @@ app.post(`${BASE_URL}/v1/2fa/totp/generate`, async (req, res) => {
     if (!a) return errorWebResponse(res, { message: `invalid session`, error: true }, true);
     if (a.totpActive) {
         if (!req.body || !req.body.replace || req.body.replace !== `true`) {
-            return errorWebResponse(res, { message: `totp already activated; send the body {replace:true} to override`, error: true, warning: `token is present` }, true);
+            return errorWebResponse(res, { message: `totp already activated; send the body { replace: true } to override`, error: true, warning: `token is present` }, true);
         }
     }
     const secret = authenticator.generateSecret();
@@ -393,7 +385,7 @@ app.post(`${BASE_URL}/v1/2fa/webauthn/register/verify`, async (req, res) => {
     return errorWebResponse(res, { message: `WebAuthn challenge failed`, error: true }, true);
 });
 
-app.post(`${BASE_URL}/v1/createsession/2fa/totp`, async (req, res) => {
+app.post(`${BASE_URL}/v1/2fa/createsession/totp`, async (req, res) => {
     if (!req.cookies) return errorWebResponse(res, { message: `missing cookies`, error: true });
     if (!req.cookies.firstFactorToken) return errorWebResponse(res, { message: `missing firstFactorToken cookie`, error: true });
     if (!req.body) return errorWebResponse(res, { message: `missing body`, error: true });
@@ -417,7 +409,7 @@ app.post(`${BASE_URL}/v1/createsession/2fa/totp`, async (req, res) => {
         });
 
         //append session cookie to response
-        res.cookie(`session`, newSessionID, {
+        res.cookie(`sessionId`, newSessionID, {
             maxAge: 10000000000,
             ...SECURE_COOKIE_ATTRIBUTES
         });
@@ -431,7 +423,7 @@ app.post(`${BASE_URL}/v1/createsession/2fa/totp`, async (req, res) => {
     return errorWebResponse(res, { message: `invalid totp`, error: true }, true);
 });
 
-app.post(`${BASE_URL}/v1/createsession/2fa/webauthn/request`, async (req, res) => {
+app.post(`${BASE_URL}/v1/2fa/createsession/webauthn/request`, async (req, res) => {
     if (!req.cookies) return errorWebResponse(res, { message: `missing cookies`, error: true });
     if (!req.cookies.firstFactorToken) return errorWebResponse(res, { message: `missing firstFactorToken cookie`, error: true });
     const fft = xss(req.cookies.firstFactorToken);
@@ -457,7 +449,7 @@ app.post(`${BASE_URL}/v1/createsession/2fa/webauthn/request`, async (req, res) =
     newChallenge.userVerification = `preferred`;
     res.send(newChallenge);
 });
-app.post(`${BASE_URL}/v1/createsession/2fa/webauthn/verify`, async (req, res) => {
+app.post(`${BASE_URL}/v1/2fa/createsession/webauthn/verify`, async (req, res) => {
     if (!req.cookies) return errorWebResponse(res, { message: `missing cookies`, error: true });
     if (!req.cookies.firstFactorToken) return errorWebResponse(res, { message: `missing firstFactorToken cookie`, error: true });
     if (!req.body) return errorWebResponse(res, { message: `missing body`, error: true });
@@ -487,7 +479,7 @@ app.post(`${BASE_URL}/v1/createsession/2fa/webauthn/verify`, async (req, res) =>
         });
 
         //append session cookie to response
-        res.cookie(`session`, newSessionID, {
+        res.cookie(`sessionId`, newSessionID, {
             maxAge: 10000000000,
             ...SECURE_COOKIE_ATTRIBUTES
         });
@@ -502,12 +494,9 @@ app.post(`${BASE_URL}/v1/createsession/2fa/webauthn/verify`, async (req, res) =>
 });
 
 app.post(`${BASE_URL}/v1/logout`, async (req, res) => {
-    if (!req.cookies || !req.cookies.session) return errorWebResponse(res, { message: `missing cookies`, error: true });
-
-    const sessionCookie = xss(req.cookies.session);
-    await db.get(`session`).findOneAndDelete({ session: sessionCookie });
-
-    res.cookie(`session`, ``, {
+    if (!req.cookies || !req.cookies.sessionId) return errorWebResponse(res, { message: `missing cookies`, error: true });
+    await db.query("DELETE FROM sessions WHERE sessionId=$1", [req.cookies.sessionId]);
+    res.cookie(`sessionId`, ``, {
         maxAge: 1,
         ...SECURE_COOKIE_ATTRIBUTES
     });
@@ -515,17 +504,18 @@ app.post(`${BASE_URL}/v1/logout`, async (req, res) => {
 });
 
 app.post(`${BASE_URL}/v1/delete-account`, async (req, res) => {
-    if (!req.cookies || !req.cookies.session) return errorWebResponse(res, { message: `missing cookies`, error: true });
+    if (!req.cookies || !req.cookies.sessionId) return errorWebResponse(res, { message: `missing cookies`, error: true });
 
     const user = await checkSession(req);
     if (!user) return errorWebResponse(res, { message: `invalid session`, error: true }, true);
 
-    await db.get(`session`).findOneAndDelete({ session: sessionCookie });
-    res.cookie(`session`, ``, {
+    await db.query("DELETE FROM sessions WHERE sessionId=$1", [req.cookies.sessionId]);
+
+    res.cookie(`sessionId`, ``, {
         maxAge: 1,
         ...SECURE_COOKIE_ATTRIBUTES
     });
-    await db.get(`user`).findOneAndDelete({ _id: user._id });
+    await db.query("DELETE FROM users WHERE userId=$1", [user.userId]);
     return res.sendStatus(200);
 });
 
@@ -538,14 +528,9 @@ app.post(`*`, (req, res) => {
 
 // check session token
 const checkSession = async req => {
-    const sessionCookie = xss(req.cookies.session);
-    const session = await db.get(`session`).findOne({
-        session: sessionCookie
-    });
+    const session = (await db.query("SELECT * FROM sessions WHERE sessionId=$1", [req.cookies.sessionId])).rows[0];
     if (!session) return false;
-    const user = await db.get(`user`).findOne({
-        userId: session.userId
-    });
+    const user = (await db.query("SELECT * FROM users WHERE userId=$1", [session.userId])).rows[0];
     if (!user) return false;
     return user;
 };
@@ -565,5 +550,4 @@ const errorWebResponse = (res, responseObject, overrideDebug = false) => {
     }
     return res.type("application/json").status(400).send({ message: `Error`, error: true });
 };
-
 module.exports = { app, BASE_URL, server };

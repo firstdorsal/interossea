@@ -2,7 +2,7 @@
     "name": "interossea",
     "version": "2.0.0",
     "description": "API for login with magic links",
-    "main": "index.js",
+    "main": "index.mjs",
     "scripts": {
         "start": "node index.js",
         "test": "bash test.sh"

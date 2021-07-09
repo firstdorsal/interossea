@@ -1,10 +1,11 @@
 process.env.DB_URI = "localhost";
 process.env.DEBUG = true;
 process.env.PORT = 3000;
-const { BASE_URL, app, server } = require("../../index");
+const { BASE_URL, app, server } = require("../../index.js");
 const supertest = require("supertest");
 const request = supertest(app);
 const URL = `${BASE_URL}/v1/login`;
+const delay = ms => new Promise(res => setTimeout(res, ms));
 
 test("requests a login mail without sending data", async () => {
     const response = await request.post(URL);
