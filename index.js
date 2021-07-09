@@ -42,12 +42,18 @@ db.query(
         userId varchar(15) NOT NULL,
         time bigint NOT NULL,
         ip varchar(50) NOT NULL,
+        webAuthnLoginChallenge varchar(100),
         PRIMARY KEY (firstFactorToken)
     );
     CREATE TABLE users (
         email varchar(254) NOT NULL UNIQUE,
         userId varchar(15) NOT NULL UNIQUE,
         time bigint NOT NULL,
+        totpSecret varchar(100),
+        totpActive boolean DEFAULT false,
+        webAuthnRegisterChallenge varchar(100),
+        webAuthnActive boolean DEFAULT false,
+        webAuthnKey json,
         PRIMARY KEY (userId)
     );
     CREATE TABLE sessions (
@@ -127,9 +133,9 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
     });
 
     // send error if token is missing
-    if (!req.query) return errorWebResponse(res, { message: `no query specified`, error: true });
+    if (!req.query) return webResponse(res, { message: `no query specified`, error: true });
 
-    if (!req.query.t) return errorWebResponse(res, { message: `no login token present`, error: true });
+    if (!req.query.t) return webResponse(res, { message: `no login token present`, error: true });
 
     // sanitize the token
     const t = xss(req.query.t);
@@ -142,25 +148,25 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
 
     // check if token exists and hasnt expired
     const ip = req.ip;
-    if (!a) return errorWebResponse(res, { message: `Invalid login token`, error: true }, true);
+    if (!a) return webResponse(res, { message: `Invalid login token`, error: true }, true);
     if (!a.time || a.time + 1000 * 60 * MAGIC_LINK_EXPIRE_MINUTES < Date.now()) {
-        return errorWebResponse(res, { message: `Expired login token`, error: true }, true);
+        return webResponse(res, { message: `Expired login token`, error: true }, true);
     }
     // check if ip requesting the token is the same as ip trying to start a session with it
     if (!DEBUG) {
         if (!a.ip || a.ip !== ip) {
-            return errorWebResponse(res, { message: `Request was sent from a different IP`, error: true }, true);
+            return webResponse(res, { message: `Request was sent from a different IP`, error: true }, true);
         }
     }
-    if (!req.cookies) return errorWebResponse(res, { message: `missing cookies`, error: true });
+    if (!req.cookies) return webResponse(res, { message: `missing cookies`, error: true });
 
-    if (!req.cookies.preSessionId) return errorWebResponse(res, { message: `missing preSessionId cookie: Request was sent from a different origin/browser`, error: true }, true);
+    if (!req.cookies.preSessionId) return webResponse(res, { message: `missing preSessionId cookie: Request was sent from a different origin/browser`, error: true }, true);
 
     const preSessionId = xss(req.cookies.preSessionId);
 
     // check if browser origin and device is the same
     if (!a.preSessionId || a.preSessionId !== preSessionId) {
-        return errorWebResponse(res, { message: `invalid preSessionId cookie: Request was sent from a different origin/browser`, error: true }, true);
+        return webResponse(res, { message: `invalid preSessionId cookie: Request was sent from a different origin/browser`, error: true }, true);
     }
 
     // try to find user with email
@@ -217,7 +223,7 @@ app.use((req, res, next) => {
 // send link to login
 app.post(`${BASE_URL}/v1/login`, async (req, res) => {
     if (!req.body || !req.body.email || !req.body.email.match(emailRegex)) {
-        return errorWebResponse(res, { message: `invalid mail`, error: true });
+        return webResponse(res, { message: `invalid mail`, error: true });
     }
     const email = xss(req.body.email);
     const a = (await db.query(`SELECT * FROM login WHERE email=$1`, [email])).rows[0];
@@ -229,7 +235,7 @@ app.post(`${BASE_URL}/v1/login`, async (req, res) => {
     if (a) {
         if (a.time + 1000 * 60 * REQUEST_NEW_MAGIC_LINK_MINUTES > Date.now()) {
             const wait = (a.time + 1000 * 60 * REQUEST_NEW_MAGIC_LINK_MINUTES - Date.now()) / 1000;
-            return errorWebResponse(
+            return webResponse(
                 res,
                 {
                     message: `Please wait another ${wait}s before requesting a new login mail`,
@@ -283,30 +289,21 @@ app.post(`${BASE_URL}/v1/login`, async (req, res) => {
         maxAge: 1,
         ...SECURE_COOKIE_ATTRIBUTES
     });
-    return errorWebResponse(res, { message: `Success`, error: false }, true);
+    return webResponse(res, { message: `Success`, error: false }, true);
 });
 
 // two factor authentication
 app.post(`${BASE_URL}/v1/2fa/totp/generate`, async (req, res) => {
     const a = await checkSession(req);
-    if (!a) return errorWebResponse(res, { message: `invalid session`, error: true }, true);
+    if (!a) return webResponse(res, { message: `invalid session`, error: true }, true);
     if (a.totpActive) {
         if (!req.body || !req.body.replace || req.body.replace !== `true`) {
-            return errorWebResponse(res, { message: `totp already activated; send the body { replace: true } to override`, error: true, warning: `token is present` }, true);
+            return webResponse(res, { message: `totp already activated; send the body { replace: true } to override`, error: true, warning: `token is present` }, true);
         }
     }
     const secret = authenticator.generateSecret();
     const otpauth = authenticator.keyuri(a.userId, WEB_URL, secret);
-    db.collection(`user`).findOneAndUpdate(
-        {
-            _id: a._id
-        },
-        {
-            $set: {
-                totpSecret: secret
-            }
-        }
-    );
+    db.query("UPDATE users SET totpSecret=$2 WHERE userId=$1", [user.userId, secret]);
 
     qrcode.toDataURL(otpauth, (err, url) => {
         res.status(200).send({
@@ -318,165 +315,114 @@ app.post(`${BASE_URL}/v1/2fa/totp/generate`, async (req, res) => {
 
 app.post(`${BASE_URL}/v1/2fa/totp/register`, async (req, res) => {
     const a = await checkSession(req);
-    if (!a) return errorWebResponse(res, { message: `invalid session token`, error: true }, true);
-    if (!req.body) return errorWebResponse(res, { message: `missing body`, error: true });
-    if (!req.body.totp) return errorWebResponse(res, { message: `totp token missing`, error: true });
+    if (!a) return webResponse(res, { message: `invalid session token`, error: true }, true);
+    if (!req.body) return webResponse(res, { message: `missing body`, error: true });
+    if (!req.body.totp) return webResponse(res, { message: `totp token missing`, error: true });
     if (authenticator.generate(a.totpSecret) === req.body.totp) {
-        await db.collection(`user`).findOneAndUpdate(
-            {
-                _id: a._id
-            },
-            {
-                $set: {
-                    totpActive: true
-                }
-            }
-        );
-        return errorWebResponse(res, { message: `correct totp token`, error: false }, true);
+        db.query("UPDATE users SET totpActive=true WHERE userId=$1", [user.userId]);
+        return webResponse(res, { message: `correct totp token`, error: false }, true);
     }
-    return errorWebResponse(res, { message: `invalid totp token`, error: true }, true);
+    return webResponse(res, { message: `invalid totp token`, error: true }, true);
 });
 
 app.post(`${BASE_URL}/v1/2fa/webauthn/register/request`, async (req, res) => {
     const user = await checkSession(req);
-    if (!user) return errorWebResponse(res, { message: `invalid session token`, error: true }, true);
+    if (!user) return webResponse(res, { message: `invalid session token`, error: true }, true);
 
     const challengeResponse = generateRegistrationChallenge({
         relyingParty: { name: process.env.DISPLAY_NAME },
         user: { id: user.userId, name: user.userId }
     });
-
-    db.collection(`user`).findOneAndUpdate(
-        {
-            _id: user._id
-        },
-        {
-            $set: {
-                webAuthnRegisterChallenge: challengeResponse.challenge
-            }
-        }
-    );
+    db.query("UPDATE users SET webAuthnRegisterChallenge=$2 WHERE userId=$1", [user.userId, challengeResponse.challenge]);
 
     return res.send(challengeResponse);
 });
 
 app.post(`${BASE_URL}/v1/2fa/webauthn/register/verify`, async (req, res) => {
     const user = await checkSession(req);
-    if (!user) return errorWebResponse(res, { message: `invalid session token`, error: true }, true);
+    if (!user) return webResponse(res, { message: `invalid session token`, error: true }, true);
 
     const { key, challenge } = parseRegisterRequest(req.body);
-    db.collection(`user`).findOne({ webAuthnRegisterChallenge: challenge });
 
-    if (db.collection.length) {
-        db.collection(`user`).findOneAndUpdate(
-            {
-                _id: user._id
-            },
-            {
-                $set: {
-                    webAuthnKey: key,
-                    webAuthnActive: true,
-                    webAuthnRegisterChallenge: false
-                }
-            }
-        );
-        return errorWebResponse(res, { message: `Success`, error: false }, true);
+    if (challenge === user.webAuthnRegisterChallenge) {
+        db.query("UPDATE users SET webAuthnKey=$2, webAuthnRegisterChallenge=null, webAuthnActive=true WHERE userId=$1", [user.userId, key]);
+        return webResponse(res, { message: `Success`, error: false }, true);
     }
-    return errorWebResponse(res, { message: `WebAuthn challenge failed`, error: true }, true);
+    return webResponse(res, { message: `WebAuthn challenge failed`, error: true }, true);
 });
 
 app.post(`${BASE_URL}/v1/2fa/createsession/totp`, async (req, res) => {
-    if (!req.cookies) return errorWebResponse(res, { message: `missing cookies`, error: true });
-    if (!req.cookies.firstFactorToken) return errorWebResponse(res, { message: `missing firstFactorToken cookie`, error: true });
-    if (!req.body) return errorWebResponse(res, { message: `missing body`, error: true });
-    if (!req.body.totp) return errorWebResponse(res, { message: `missing totp object in body`, error: true });
+    if (!req.cookies) return webResponse(res, { message: `missing cookies`, error: true });
+    if (!req.cookies.firstFactorToken) return webResponse(res, { message: `missing firstFactorToken cookie`, error: true });
+    if (!req.body) return webResponse(res, { message: `missing body`, error: true });
+    if (!req.body.totp) return webResponse(res, { message: `missing totp object in body`, error: true });
 
-    const login = await db.get(`login`).findOne({ firstFactorToken: req.cookies.firstFactorToken });
-    if (!login) return errorWebResponse(res, { message: `invalid firstFactorToken`, error: true });
+    const login = db.query("SELECT * FROM login2 WHERE firstFactorToken=$1", [req.cookies.firstFactorToken]);
+    if (!login) return webResponse(res, { message: `invalid firstFactorToken`, error: true });
 
-    const user = await db.get(`user`).findOne({ userId: login.userId });
+    const user = db.query("SELECT * FROM users WHERE userId=$1", [login.userId]);
     if (authenticator.generate(user.totpSecret) === req.body.totp) {
         //generate session id
         const newSessionID = generateToken(100);
 
         //save session cookie to db
-        await db.get(`session`).insert({
-            session: newSessionID,
-            userId: user.userId,
-            time: Date.now(),
-            ip: req.headers[`x-forwarded-for`],
-            userAgent: req.headers[`user-agent`] ? req.headers[`user-agent`] : ``
-        });
+        await db.query(`INSERT INTO sessions (sessionId, userId, time, ip) VALUES ($1, $2, $3, $4)`, [newSessionID, user.userId, Date.now(), req.ip]);
 
         //append session cookie to response
         res.cookie(`sessionId`, newSessionID, {
             maxAge: 10000000000,
             ...SECURE_COOKIE_ATTRIBUTES
         });
+        //delete firstFactorToken cookie
         res.cookie(`firstFactorToken`, ``, {
             maxAge: 1,
             ...SECURE_COOKIE_ATTRIBUTES
         });
 
-        return errorWebResponse(res, { message: `Success`, error: false }, true);
+        return webResponse(res, { message: `Success`, error: false }, true);
     }
-    return errorWebResponse(res, { message: `invalid totp`, error: true }, true);
+    return webResponse(res, { message: `invalid totp`, error: true }, true);
 });
 
 app.post(`${BASE_URL}/v1/2fa/createsession/webauthn/request`, async (req, res) => {
-    if (!req.cookies) return errorWebResponse(res, { message: `missing cookies`, error: true });
-    if (!req.cookies.firstFactorToken) return errorWebResponse(res, { message: `missing firstFactorToken cookie`, error: true });
-    const fft = xss(req.cookies.firstFactorToken);
+    if (!req.cookies) return webResponse(res, { message: `missing cookies`, error: true });
+    if (!req.cookies.firstFactorToken) return webResponse(res, { message: `missing firstFactorToken cookie`, error: true });
+    const login = db.query("SELECT * FROM login2 WHERE firstFactorToken=$1", [req.cookies.firstFactorToken]);
 
-    const login = await db.get(`login`).findOne({ firstFactorToken: fft });
+    if (!login) return webResponse(res, { message: `invalid firstFactorToken`, error: true });
 
-    if (!login) return errorWebResponse(res, { message: `invalid firstFactorToken`, error: true });
-    const user = await db.get(`user`).findOne({ userId: login.userId });
-    if (!user) return errorWebResponse(res, { message: `user not found`, error: true });
-    if (!user.webAuthnKey) return errorWebResponse(res, { message: `missing public key for this user`, error: true });
+    const user = db.query("SELECT * FROM users WHERE userId=$1", [login.userId]);
+    if (!user) return webResponse(res, { message: `user not found`, error: true });
+    if (!user.webAuthnKey) return webResponse(res, { message: `missing public key for this user`, error: true });
 
     const newChallenge = generateLoginChallenge(user.webAuthnKey);
-    db.collection(`login`).findOneAndUpdate(
-        {
-            _id: login._id
-        },
-        {
-            $set: {
-                webAuthnLoginChallenge: newChallenge.challenge
-            }
-        }
-    );
+    db.query("UPDATE login2 SET webAuthnLoginChallenge=$2 WHERE firstFactorToken=$1", [login.firstFactorToken, newChallenge.challenge]);
+
     newChallenge.userVerification = `preferred`;
     res.send(newChallenge);
 });
 app.post(`${BASE_URL}/v1/2fa/createsession/webauthn/verify`, async (req, res) => {
-    if (!req.cookies) return errorWebResponse(res, { message: `missing cookies`, error: true });
-    if (!req.cookies.firstFactorToken) return errorWebResponse(res, { message: `missing firstFactorToken cookie`, error: true });
-    if (!req.body) return errorWebResponse(res, { message: `missing body`, error: true });
-    const login = await db.get(`login`).findOne({ firstFactorToken: req.cookies.firstFactorToken });
-    if (!login) return errorWebResponse(res, { message: `invalid firstFactorToken`, error: true });
-    const user = await db.get(`user`).findOne({ userId: login.userId });
-    if (!user) return errorWebResponse(res, { message: `user not found`, error: true });
-    if (!user.webAuthnKey) return errorWebResponse(res, { message: `missing public key for this user`, error: true });
+    if (!req.cookies) return webResponse(res, { message: `missing cookies`, error: true });
+    if (!req.cookies.firstFactorToken) return webResponse(res, { message: `missing firstFactorToken cookie`, error: true });
+    if (!req.body) return webResponse(res, { message: `missing body`, error: true });
+    const login = db.query("SELECT * FROM login2 WHERE firstFactorToken=$1", [req.cookies.firstFactorToken]);
+    if (!login) return webResponse(res, { message: `invalid firstFactorToken`, error: true });
+    const user = db.query("SELECT * FROM users WHERE userId=$1", [login.userId]);
+    if (!user) return webResponse(res, { message: `user not found`, error: true });
+    if (!user.webAuthnKey) return webResponse(res, { message: `missing public key for this user`, error: true });
 
     const { challenge, keyId } = parseLoginRequest(req.body);
 
-    if (!challenge) return errorWebResponse(res, { message: `missing challenge`, error: true });
-    if (user.webAuthnKey.credID !== keyId) return errorWebResponse(res, { message: `invalid webAuthnKey`, error: true });
-    if (login.webAuthnLoginChallenge !== challenge) return errorWebResponse(res, { message: `invalid challenge`, error: true });
+    if (!challenge) return webResponse(res, { message: `missing challenge`, error: true });
+    if (user.webAuthnKey.credID !== keyId) return webResponse(res, { message: `invalid webAuthnKey`, error: true });
+    if (login.webAuthnLoginChallenge !== challenge) return webResponse(res, { message: `invalid challenge`, error: true });
     //solvedChallenge === login.webAuthnLoginChallenge
     if (verifyAuthenticatorAssertion(req.body, user.webAuthnKey)) {
         //generate session id
         const newSessionID = generateToken(100);
 
         //save session cookie to db
-        await db.get(`session`).insert({
-            session: newSessionID,
-            userId: user.userId,
-            time: Date.now(),
-            ip: req.headers[`x-forwarded-for`],
-            userAgent: req.headers[`user-agent`] ? req.headers[`user-agent`] : ``
-        });
+        await db.query(`INSERT INTO sessions (sessionId, userId, time, ip) VALUES ($1, $2, $3, $4)`, [newSessionID, user.userId, Date.now(), req.ip]);
 
         //append session cookie to response
         res.cookie(`sessionId`, newSessionID, {
@@ -488,13 +434,13 @@ app.post(`${BASE_URL}/v1/2fa/createsession/webauthn/verify`, async (req, res) =>
             ...SECURE_COOKIE_ATTRIBUTES
         });
 
-        return errorWebResponse(res, { message: `success`, error: false }, true);
+        return webResponse(res, { message: `success`, error: false }, true);
     }
-    return errorWebResponse(res, { message: `WebAuthn challenge failed`, error: true }, true);
+    return webResponse(res, { message: `WebAuthn challenge failed`, error: true }, true);
 });
 
 app.post(`${BASE_URL}/v1/logout`, async (req, res) => {
-    if (!req.cookies || !req.cookies.sessionId) return errorWebResponse(res, { message: `missing cookies`, error: true });
+    if (!req.cookies || !req.cookies.sessionId) return webResponse(res, { message: `missing cookies`, error: true });
     await db.query("DELETE FROM sessions WHERE sessionId=$1", [req.cookies.sessionId]);
     res.cookie(`sessionId`, ``, {
         maxAge: 1,
@@ -504,10 +450,10 @@ app.post(`${BASE_URL}/v1/logout`, async (req, res) => {
 });
 
 app.post(`${BASE_URL}/v1/delete-account`, async (req, res) => {
-    if (!req.cookies || !req.cookies.sessionId) return errorWebResponse(res, { message: `missing cookies`, error: true });
+    if (!req.cookies || !req.cookies.sessionId) return webResponse(res, { message: `missing cookies`, error: true });
 
     const user = await checkSession(req);
-    if (!user) return errorWebResponse(res, { message: `invalid session`, error: true }, true);
+    if (!user) return webResponse(res, { message: `invalid session`, error: true }, true);
 
     await db.query("DELETE FROM sessions WHERE sessionId=$1", [req.cookies.sessionId]);
 
@@ -541,7 +487,7 @@ const generateToken = length => {
 };
 
 // create a debug or default web response
-const errorWebResponse = (res, responseObject, overrideDebug = false) => {
+const webResponse = (res, responseObject, overrideDebug = false) => {
     if (overrideDebug || DEBUG) {
         return res
             .type("application/json")
