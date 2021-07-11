@@ -415,7 +415,7 @@ app.post(`${BASE_URL}/v1/2fa/createsession/webauthn/verify`, async (req, res) =>
     if (!user) return webResponse(res, { message: `user not found`, error: true });
     if (!user.webAuthnKey) return webResponse(res, { message: `missing public key for this user`, error: true });
 
-    const { challenge, keyId } = parseLoginRequest(req.body);
+    const { challenge, keyId } = parseLoginRequest(req.body.credentials);
 
     if (!challenge) return webResponse(res, { message: `missing challenge`, error: true });
     if (user.webAuthnKey.credID !== keyId) return webResponse(res, { message: `invalid webAuthnKey`, error: true });
