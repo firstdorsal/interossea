@@ -96,7 +96,7 @@ app.use(compression());
 app.use(bodyParser.json({ limit: `10kb` }));
 app.use(helmet.hidePoweredBy());
 app.disable(`etag`);
-app.use(express.static(`public`));
+app.use(BASE_URL, express.static(`public`));
 app.set(`view engine`, `pug`);
 app.set("trust proxy", true);
 app.locals.basedir = path.join(__dirname, `views`);
