@@ -303,14 +303,15 @@ app.post(`${BASE_URL}/v1/2fa/totp/generate`, async (req, res) => {
     const otpauth = authenticator.keyuri(user.userId, WEB_URL, secret);
     db.query(/*sql*/ `UPDATE "users" SET "totpSecret"=$2 WHERE "userId"=$1`, [user.userId, secret]);
 
-    qrcode.toDataURL(otpauth, (err, url) => {
+    qrcode.toDataURL(otpauth, (err, qrCode) => {
         if (err) {
             console.log(err);
             return webResponse(res, { message: `failed to create qr code`, error: true });
         }
         return res.status(200).send({
-            qrCode: url,
-            secret
+            qrCode,
+            secret,
+            url: otpauth
         });
     });
 });
