@@ -187,9 +187,9 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
             ...SECURE_COOKIE_ATTRIBUTES
         });
 
-        if (user.totpActive && user.webAuthnActive) return res.redirect(`/login/2fa`);
-        if (user.totpActive) return res.redirect(`/login/2fa/totp`);
-        return res.redirect(`/login/2fa/webauthn`);
+        if (user.totpActive && user.webAuthnActive) return res.redirect(`${DISABLE_FRONTEND ? "" : BASE_URL}/login/2fa`);
+        if (user.totpActive) return res.redirect(`${DISABLE_FRONTEND ? "" : BASE_URL}/login/2fa/totp`);
+        return res.redirect(`${DISABLE_FRONTEND ? "" : BASE_URL}/login/2fa/webauthn`);
     }
     // generate session id
     const newSessionID = generateToken(100);
@@ -203,7 +203,7 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
         ...SECURE_COOKIE_ATTRIBUTES
     });
 
-    return res.redirect(`${BASE_URL}/2fa`);
+    return res.redirect(`${DISABLE_FRONTEND ? "" : BASE_URL}/2fa`);
 });
 
 app.use((req, res, next) => {
