@@ -10,12 +10,15 @@ const cryptoRandomString = require(`crypto-random-string`);
 const helmet = require(`helmet`);
 const rateLimit = require(`express-rate-limit`);
 const path = require(`path`);
-
-const app = express();
-
 const nodemailer = require(`nodemailer`);
+const xss = require(`xss`);
+const qrcode = require(`qrcode`);
+const { generateRegistrationChallenge, parseRegisterRequest, parseLoginRequest, generateLoginChallenge, verifyAuthenticatorAssertion } = require(`@webauthn/server`);
+const { authenticator } = require(`otplib`);
 
 const DB_URI = process.env.DB_URI !== undefined ? process.env.DB_URI : `db`;
+
+// init db: create the database on the pg server
 require("./lib/initPg")(DB_URI);
 const { Client } = require(`pg`);
 
@@ -66,11 +69,6 @@ db.query(
     `
 ).catch(() => {});
 
-const xss = require(`xss`);
-const qrcode = require(`qrcode`);
-const { generateRegistrationChallenge, parseRegisterRequest, parseLoginRequest, generateLoginChallenge, verifyAuthenticatorAssertion } = require(`@webauthn/server`);
-const { authenticator } = require(`otplib`);
-
 // define and handle global variables
 const WEBSCHEMA = process.env.WEB_SCHEMA != undefined ? process.env.WEB_SCHEMA : `https`;
 const PORT = process.env.PORT !== undefined ? process.env.PORT : 80;
@@ -90,7 +88,8 @@ const IP_REQUEST_TIME_MINUTES = process.env.IP_REQUEST_TIME_MINUTES !== undefine
 
 const IP_REQUEST_PER_TIME = process.env.IP_REQUEST_PER_TIME !== undefined ? process.env.IP_REQUEST_PER_TIME : 100;
 
-// set express settings
+// create express and set settings
+const app = express();
 const server = app.listen(PORT);
 app.use(cookieParser());
 app.use(compression());
@@ -103,13 +102,15 @@ app.set("trust proxy", true);
 app.locals.basedir = path.join(__dirname, `views`);
 
 // apply rate limiting to login
-const limiter = rateLimit({
-    windowMs: IP_REQUEST_TIME_MINUTES * 60 * 1000,
-    max: IP_REQUEST_PER_TIME
-});
-app.use(`${BASE_URL}/v1/login`, limiter);
+app.use(
+    `${BASE_URL}/v1/login`,
+    rateLimit({
+        windowMs: IP_REQUEST_TIME_MINUTES * 60 * 1000,
+        max: IP_REQUEST_PER_TIME
+    })
+);
 
-// frontend
+// frontend if enabled
 app.get(`${BASE_URL}/`, (req, res) => {
     res.render(`index`);
 });
@@ -118,8 +119,6 @@ if (!process.env.DISABLE_FRONTEND) {
         res.render(`login/index`);
     });
 }
-
-// TODO ADD JWT AS COOKIE THAT PROOFS THAT USER HAS SIGNED IN BEFORE
 
 // handle clicked link
 app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
@@ -134,7 +133,6 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
 
     // send error if token is missing
     if (!req.query) return webResponse(res, { message: `no query specified`, error: true });
-
     if (!req.query.t) return webResponse(res, { message: `no login token present`, error: true });
 
     // sanitize the token
@@ -153,16 +151,14 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
         return webResponse(res, { message: `Expired login token`, error: true }, true);
     }
     // check if ip requesting the token is the same as ip trying to start a session with it
-    if (!DEBUG) {
-        if (!a.ip || a.ip !== ip) {
-            return webResponse(res, { message: `Request was sent from a different IP`, error: true }, true);
-        }
+    if ((!DEBUG && !a.ip) || a.ip !== ip) {
+        return webResponse(res, { message: `Request was sent from a different IP`, error: true }, true);
     }
-    if (!req.cookies) return webResponse(res, { message: `missing cookies`, error: true });
 
+    if (!req.cookies) return webResponse(res, { message: `missing cookies`, error: true });
     if (!req.cookies.preSessionId) return webResponse(res, { message: `missing preSessionId cookie: Request was sent from a different origin/browser`, error: true }, true);
 
-    const preSessionId = xss(req.cookies.preSessionId);
+    const preSessionId = req.cookies.preSessionId;
 
     // check if browser origin and device is the same
     if (!a.preSessionId || a.preSessionId !== preSessionId) {
@@ -233,6 +229,7 @@ app.post(`${BASE_URL}/v1/login`, async (req, res) => {
     const link = `${WEBSCHEMA}://${WEB_URL}${BASE_URL}/v1/createsession?t=${token}`;
     const ip = req.ip;
     if (a) {
+        // cooldown to send next link based on ip address
         if (a.time + 1000 * 60 * REQUEST_NEW_MAGIC_LINK_MINUTES > Date.now()) {
             const wait = (a.time + 1000 * 60 * REQUEST_NEW_MAGIC_LINK_MINUTES - Date.now()) / 1000;
             return webResponse(
