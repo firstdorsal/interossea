@@ -16,15 +16,15 @@ const qrcode = require(`qrcode`);
 const { generateRegistrationChallenge, parseRegisterRequest, parseLoginRequest, generateLoginChallenge, verifyAuthenticatorAssertion } = require(`@webauthn/server`);
 const { authenticator } = require(`otplib`);
 
-const DB_URI = process.env.DB_URI !== undefined ? process.env.DB_URI : `db`;
+const DB_URL = process.env.DB_URL !== undefined ? process.env.DB_URL : `db`;
 
 // init db: create the database on the pg server
-require("./lib/initPg")(DB_URI);
+require("./lib/initPg")(DB_URL);
 const { Client } = require(`pg`);
 
 const db = new Client({
     user: "postgres",
-    host: DB_URI,
+    host: DB_URL,
     password: "password",
     database: "db"
 });
@@ -73,7 +73,7 @@ db.query(
 const WEBSCHEMA = process.env.WEB_SCHEMA != undefined ? process.env.WEB_SCHEMA : `https`;
 const PORT = process.env.PORT !== undefined ? process.env.PORT : 80;
 const WEB_URL = process.env.WEB_URL != undefined ? process.env.WEB_URL : `localhost`;
-console.log(`server started on port ${WEBSCHEMA}://${WEB_URL}:${PORT}`);
+console.log(`server started on port ${PORT} with url ${WEBSCHEMA}://${WEB_URL}`);
 
 const DEBUG = process.env.DEBUG || false;
 console.log(`debug mode set to ${DEBUG}. ${DEBUG ? `DONT USE IN PRODUCTION` : ``}`);

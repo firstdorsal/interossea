@@ -3,7 +3,7 @@
 # Data to be provided
 
 ```.env
-DB_URI='db'
+DB_URL='db'
 
 LOGIN_MAIL_USERNAME='mail@example.com'
 LOGIN_MAIL_PASSWORD='password'

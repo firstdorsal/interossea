@@ -1,4 +1,4 @@
-process.env.DB_URI = "localhost";
+process.env.DB_URL = "localhost";
 process.env.DEBUG = true;
 process.env.PORT = 3000;
 const { BASE_URL, app, server } = require("../../index.js");
