@@ -354,10 +354,10 @@ app.post(`${BASE_URL}/v1/2fa/createsession/totp`, async (req, res) => {
     if (!req.body) return webResponse(res, { message: `missing body`, error: true });
     if (!req.body.totp) return webResponse(res, { message: `missing totp object in body`, error: true });
 
-    const login = db.query("SELECT * FROM login2 WHERE firstFactorToken=$1", [req.cookies.firstFactorToken]);
+    const login = (await db.query("SELECT * FROM login2 WHERE firstFactorToken=$1", [req.cookies.firstFactorToken])).rows[0];
     if (!login) return webResponse(res, { message: `invalid firstFactorToken`, error: true });
 
-    const user = db.query("SELECT * FROM users WHERE userId=$1", [login.userId]);
+    const user = (await db.query("SELECT * FROM users WHERE userId=$1", [login.userId])).rows[0];
     if (authenticator.generate(user.totpSecret) === req.body.totp) {
         //generate session id
         const newSessionID = generateToken(100);
@@ -384,11 +384,11 @@ app.post(`${BASE_URL}/v1/2fa/createsession/totp`, async (req, res) => {
 app.post(`${BASE_URL}/v1/2fa/createsession/webauthn/request`, async (req, res) => {
     if (!req.cookies) return webResponse(res, { message: `missing cookies`, error: true });
     if (!req.cookies.firstFactorToken) return webResponse(res, { message: `missing firstFactorToken cookie`, error: true });
-    const login = db.query("SELECT * FROM login2 WHERE firstFactorToken=$1", [req.cookies.firstFactorToken]);
+    const login = (await db.query("SELECT * FROM login2 WHERE firstFactorToken=$1", [req.cookies.firstFactorToken])).rows[0];
 
     if (!login) return webResponse(res, { message: `invalid firstFactorToken`, error: true });
 
-    const user = db.query("SELECT * FROM users WHERE userId=$1", [login.userId]);
+    const user = (await db.query("SELECT * FROM users WHERE userId=$1", [login.userId])).rows[0];
     if (!user) return webResponse(res, { message: `user not found`, error: true });
     if (!user.webAuthnKey) return webResponse(res, { message: `missing public key for this user`, error: true });
 
@@ -398,13 +398,14 @@ app.post(`${BASE_URL}/v1/2fa/createsession/webauthn/request`, async (req, res) =
     newChallenge.userVerification = `preferred`;
     res.send(newChallenge);
 });
+
 app.post(`${BASE_URL}/v1/2fa/createsession/webauthn/verify`, async (req, res) => {
     if (!req.cookies) return webResponse(res, { message: `missing cookies`, error: true });
     if (!req.cookies.firstFactorToken) return webResponse(res, { message: `missing firstFactorToken cookie`, error: true });
     if (!req.body) return webResponse(res, { message: `missing body`, error: true });
-    const login = db.query("SELECT * FROM login2 WHERE firstFactorToken=$1", [req.cookies.firstFactorToken]);
+    const login = (await db.query("SELECT * FROM login2 WHERE firstFactorToken=$1", [req.cookies.firstFactorToken])).rows[0];
     if (!login) return webResponse(res, { message: `invalid firstFactorToken`, error: true });
-    const user = db.query("SELECT * FROM users WHERE userId=$1", [login.userId]);
+    const user = (await db.query("SELECT * FROM users WHERE userId=$1", [login.userId])).rows[0];
     if (!user) return webResponse(res, { message: `user not found`, error: true });
     if (!user.webAuthnKey) return webResponse(res, { message: `missing public key for this user`, error: true });
 
