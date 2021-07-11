@@ -159,7 +159,7 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
 
     if (!req.cookies) return webResponse(res, { message: `missing cookies`, error: true });
 
-    if (!req.cookies.preSessionId) return webResponse(res, { message: `missing preSessionId cookie: Request was sent from a different origin/browser`, error: true }, true);
+    if (!req.cookies.preSessionId) return webResponse(res, { message: `missing preSessionId cookie: Request was sent from a different origin/browser?`, error: true }, true);
 
     // check if last request was sent from same browser
     if (!a.preSessionId || a.preSessionId !== req.cookies.preSessionId) {
@@ -304,7 +304,11 @@ app.post(`${BASE_URL}/v1/2fa/totp/generate`, async (req, res) => {
     db.query(/*sql*/ `UPDATE "users" SET "totpSecret"=$2 WHERE "userId"=$1`, [user.userId, secret]);
 
     qrcode.toDataURL(otpauth, (err, url) => {
-        res.status(200).send({
+        if (err) {
+            console.log(err);
+            return webResponse(res, { message: `failed to create qr code`, error: true });
+        }
+        return res.status(200).send({
             qrCode: url,
             secret
         });
@@ -360,18 +364,18 @@ app.post(`${BASE_URL}/v1/2fa/createsession/totp`, async (req, res) => {
 
     const user = (await db.query(/*sql*/ `SELECT * FROM "users" WHERE "userId"=$1`, [login.userId])).rows[0];
     if (authenticator.generate(user.totpSecret) === req.body.totp) {
-        //generate session id
+        // generate session id
         const newSessionID = generateToken(100);
 
-        //save session cookie to db
+        // save session cookie to db
         await db.query(/*sql*/ `INSERT INTO "sessions" ("sessionId", "userId", "time", "ip") VALUES ($1, $2, $3, $4)`, [newSessionID, user.userId, Date.now(), req.ip]);
 
-        //append session cookie to response
+        // append session cookie to response
         res.cookie(`sessionId`, newSessionID, {
             maxAge: 10000000000,
             ...SECURE_COOKIE_ATTRIBUTES
         });
-        //delete firstFactorToken cookie
+        // delete firstFactorToken cookie
         res.cookie(`firstFactorToken`, ``, {
             maxAge: 1,
             ...SECURE_COOKIE_ATTRIBUTES
@@ -423,7 +427,7 @@ app.post(`${BASE_URL}/v1/2fa/createsession/webauthn/verify`, async (req, res) =>
         // save session cookie to db
         await db.query(/*sql*/ `INSERT INTO "sessions" ("sessionId", "userId", "time", "ip") VALUES ($1, $2, $3, $4)`, [newSessionID, user.userId, Date.now(), req.ip]);
 
-        //append session cookie to response
+        // append session cookie to response
         res.cookie(`sessionId`, newSessionID, {
             maxAge: 10000000000,
             ...SECURE_COOKIE_ATTRIBUTES
