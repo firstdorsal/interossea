@@ -2,20 +2,20 @@
     font-family: "Inter";
     font-weight: 900;
     font-display: swap;
-    src: local("Inter"), url("/fonts/inter-latin-900-normal.woff2") format("woff2");
+    src: local("Inter"), url("/interossea/fonts/inter-latin-900-normal.woff2") format("woff2");
 }
 @font-face {
     font-family: "Inter";
     font-weight: 400;
     font-display: swap;
-    src: local("Inter"), url("/fonts/inter-latin-400-normal.woff2") format("woff2");
+    src: local("Inter"), url("/interossea/fonts/inter-latin-400-normal.woff2") format("woff2");
 }
 
 @font-face {
     font-family: "Inter";
     font-weight: 600;
     font-display: swap;
-    src: local("Inter"), url("/fonts/inter-latin-600-normal.woff2") format("woff2");
+    src: local("Inter"), url("/interossea/fonts/inter-latin-600-normal.woff2") format("woff2");
 }
 
 * {
