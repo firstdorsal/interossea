@@ -75,7 +75,7 @@ const PORT = process.env.PORT !== undefined ? process.env.PORT : 80;
 const WEB_URL = process.env.WEB_URL != undefined ? process.env.WEB_URL : `localhost`;
 console.log(`server started on port ${WEBSCHEMA}://${WEB_URL}:${PORT}`);
 
-const DEBUG = process.env.DEBUG !== undefined ? process.env.DEBUG : false;
+const DEBUG = process.env.DEBUG || false;
 console.log(`debug mode set to ${DEBUG}. ${DEBUG ? `DONT USE IN PRODUCTION` : ``}`);
 const SECURE_COOKIE_ATTRIBUTES = { path: `/`, httpOnly: true, secure: true, sameSite: `Strict` };
 const BASE_URL = `/interossea`;
