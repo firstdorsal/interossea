@@ -26,7 +26,7 @@
     font-family: "Inter", sans-serif;
     --primary: darkorange;
     --text-color: black;
-    overflow: hidden;
+    overflow-x: hidden;
 }
 
 body,
@@ -119,7 +119,7 @@ label.icon {
     text-align: center;
 }
 label[for="email"] {
-    background-image: url("/images/mail.svg");
+    background-image: url("/interossea/images/mail.svg");
 }
 
 .hidden {
