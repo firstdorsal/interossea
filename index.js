@@ -88,6 +88,8 @@ const IP_REQUEST_TIME_MINUTES = process.env.IP_REQUEST_TIME_MINUTES !== undefine
 
 const IP_REQUEST_PER_TIME = process.env.IP_REQUEST_PER_TIME !== undefined ? process.env.IP_REQUEST_PER_TIME : 100;
 
+const DISABLE_FRONTEND = process.env.DISABLE_FRONTEND !== undefined ? process.env.DISABLE_FRONTEND : true;
+
 // create express and set settings
 const app = express();
 const server = app.listen(PORT);
@@ -114,7 +116,7 @@ app.use(
 app.get(`${BASE_URL}/`, (req, res) => {
     res.render(`index`);
 });
-if (!process.env.DISABLE_FRONTEND) {
+if (!DISABLE_FRONTEND) {
     app.get(`${BASE_URL}/login`, (req, res) => {
         res.render(`login/index`);
     });
