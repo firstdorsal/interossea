@@ -345,6 +345,7 @@ app.post(`${BASE_URL}/v1/2fa/webauthn/register/verify`, async (req, res) => {
     if (!user) return webResponse(res, { message: `invalid session token`, error: true }, true);
 
     const { key, challenge } = parseRegisterRequest(req.body);
+    if (DEBUG) console.log(key, challenge);
 
     if (challenge === user.webAuthnRegisterChallenge) {
         db.query(/*sql*/ `UPDATE "users" SET "webAuthnKey"=$2, "webAuthnRegisterChallenge"=null, "webAuthnActive"=true WHERE "userId"=$1`, [user.userId, key]);
