@@ -421,7 +421,7 @@ app.post(`${BASE_URL}/v1/2fa/createsession/webauthn/verify`, async (req, res) =>
     if (user.webAuthnKey.credID !== keyId) return webResponse(res, { message: `invalid webAuthnKey`, error: true });
     if (login.webAuthnLoginChallenge !== challenge) return webResponse(res, { message: `invalid challenge`, error: true });
     // solvedChallenge === login.webAuthnLoginChallenge
-    if (verifyAuthenticatorAssertion(req.body, user.webAuthnKey)) {
+    if (verifyAuthenticatorAssertion(req.body.credentials, user.webAuthnKey)) {
         // generate session id
         const newSessionID = generateToken(100);
 
