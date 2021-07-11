@@ -138,22 +138,22 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
     if (!req.query.t) return webResponse(res, { message: `no login token present`, error: true });
 
     // sanitize the token
-    const t = xss(req.query.t);
+    const token = xss(req.query.t);
 
     // find corresponding email for token t
-    const a = (await db.query(/*sql*/ `SELECT * FROM "login" WHERE "token"=$1`, [t])).rows[0];
+    const login = (await db.query(/*sql*/ `SELECT * FROM "login" WHERE "token"=$1`, [token])).rows[0];
 
     // delete login
-    await db.query(/*sql*/ `DELETE FROM "login" WHERE "token"=$1`, [t]);
+    await db.query(/*sql*/ `DELETE FROM "login" WHERE "token"=$1`, [token]);
 
     // check if token exists and hasnt expired
     const ip = req.ip;
-    if (!a) return webResponse(res, { message: `Invalid login token`, error: true }, true);
-    if (!a.time || a.time + 1000 * 60 * MAGIC_LINK_EXPIRE_MINUTES < Date.now()) {
+    if (!login) return webResponse(res, { message: `Invalid login token`, error: true }, true);
+    if (!login.time || login.time + 1000 * 60 * MAGIC_LINK_EXPIRE_MINUTES < Date.now()) {
         return webResponse(res, { message: `Expired login token`, error: true }, true);
     }
     // check if ip requesting the token is the same as ip trying to start a session with it
-    if ((!DEBUG && !a.ip) || a.ip !== ip) {
+    if ((!DEBUG && !login.ip) || login.ip !== ip) {
         return webResponse(res, { message: `Request was sent from a different IP`, error: true }, true);
     }
 
@@ -162,18 +162,18 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
     if (!req.cookies.preSessionId) return webResponse(res, { message: `missing preSessionId cookie: Request was sent from a different origin/browser?`, error: true }, true);
 
     // check if last request was sent from same browser
-    if (!a.preSessionId || a.preSessionId !== req.cookies.preSessionId) {
+    if (!login.preSessionId || login.preSessionId !== req.cookies.preSessionId) {
         return webResponse(res, { message: `invalid preSessionId cookie: Request was sent from a different origin/browser`, error: true }, true);
     }
 
     // try to find user with email
-    let user = (await db.query(/*sql*/ `SELECT * FROM "users" WHERE "email"=$1`, [a.email])).rows[0];
+    let user = (await db.query(/*sql*/ `SELECT * FROM "users" WHERE "email"=$1`, [login.email])).rows[0];
 
     // create new user if dont exist
     if (!user) {
         const userId = `u${generateToken(14)}`;
 
-        await db.query(/*sql*/ `INSERT INTO "users" ("email", "userId", "time") VALUES ($1, $2, $3)`, [a.email, userId, Date.now()]);
+        await db.query(/*sql*/ `INSERT INTO "users" ("email", "userId", "time") VALUES ($1, $2, $3)`, [login.email, userId, Date.now()]);
         user = { userId };
     } else if (user.totpActive || user.webAuthnActive) {
         // check if 2fa is present
@@ -223,16 +223,16 @@ app.post(`${BASE_URL}/v1/login`, async (req, res) => {
         return webResponse(res, { message: `invalid mail`, error: true });
     }
     const email = xss(req.body.email);
-    const a = (await db.query(/*sql*/ `SELECT * FROM "login" WHERE "email"=$1`, [email])).rows[0];
+    const login = (await db.query(/*sql*/ `SELECT * FROM "login" WHERE "email"=$1`, [email])).rows[0];
 
     const token = generateToken(100);
     const preSessionId = generateToken(100);
     const link = `${WEBSCHEMA}://${WEB_URL}${BASE_URL}/v1/createsession?t=${token}`;
     const ip = req.ip;
-    if (a) {
+    if (login) {
         // cooldown to send next link based on ip address
-        if (a.time + 1000 * 60 * REQUEST_NEW_MAGIC_LINK_MINUTES > Date.now()) {
-            const wait = (a.time + 1000 * 60 * REQUEST_NEW_MAGIC_LINK_MINUTES - Date.now()) / 1000;
+        if (login.time + 1000 * 60 * REQUEST_NEW_MAGIC_LINK_MINUTES > Date.now()) {
+            const wait = (login.time + 1000 * 60 * REQUEST_NEW_MAGIC_LINK_MINUTES - Date.now()) / 1000;
             return webResponse(
                 res,
                 {
@@ -292,15 +292,15 @@ app.post(`${BASE_URL}/v1/login`, async (req, res) => {
 
 // two factor authentication
 app.post(`${BASE_URL}/v1/2fa/totp/generate`, async (req, res) => {
-    const a = await checkSession(req);
-    if (!a) return webResponse(res, { message: `invalid session`, error: true }, true);
-    if (a.totpActive) {
+    const user = await checkSession(req);
+    if (!user) return webResponse(res, { message: `invalid session`, error: true }, true);
+    if (user.totpActive) {
         if (!req.body || !req.body.replace || req.body.replace !== `true`) {
             return webResponse(res, { message: `totp already activated; send the body { replace: true } to override`, error: true, warning: `token is present` }, true);
         }
     }
     const secret = authenticator.generateSecret();
-    const otpauth = authenticator.keyuri(a.userId, WEB_URL, secret);
+    const otpauth = authenticator.keyuri(user.userId, WEB_URL, secret);
     db.query(/*sql*/ `UPDATE "users" SET "totpSecret"=$2 WHERE "userId"=$1`, [user.userId, secret]);
 
     qrcode.toDataURL(otpauth, (err, url) => {
@@ -316,11 +316,11 @@ app.post(`${BASE_URL}/v1/2fa/totp/generate`, async (req, res) => {
 });
 
 app.post(`${BASE_URL}/v1/2fa/totp/register`, async (req, res) => {
-    const a = await checkSession(req);
-    if (!a) return webResponse(res, { message: `invalid session token`, error: true }, true);
+    const user = await checkSession(req);
+    if (!user) return webResponse(res, { message: `invalid session token`, error: true }, true);
     if (!req.body) return webResponse(res, { message: `missing body`, error: true });
     if (!req.body.totp) return webResponse(res, { message: `totp token missing`, error: true });
-    if (authenticator.generate(a.totpSecret) === req.body.totp) {
+    if (authenticator.generate(user.totpSecret) === req.body.totp) {
         db.query(/*sql*/ `UPDATE "users" SET "totpActive"=true WHERE "userId"=$1`, [user.userId]);
         return webResponse(res, { message: `correct totp token`, error: false }, true);
     }
