@@ -181,7 +181,7 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
         const firstFactorToken = generateToken(100);
 
         // add firstFactorToken to db
-        await db.query(/*sql*/ `INSERT INTO "login2" ("firstFactorToken", "userId", "time", "ip") VALUES ($1, $2, $3, $4)`, [firstFactorToken, userId, Date.now(), ip]);
+        await db.query(/*sql*/ `INSERT INTO "login2" ("firstFactorToken", "userId", "time", "ip") VALUES ($1, $2, $3, $4)`, [firstFactorToken, user.userId, Date.now(), ip]);
 
         // append firstFactorToken cookie to response
         res.cookie(`firstFactorToken`, firstFactorToken, {
