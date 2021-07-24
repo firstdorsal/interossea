@@ -30,44 +30,13 @@ const db = new Client({
 });
 db.connect().catch(() => {});
 
-db.query(
-    /*sql*/ `
-    CREATE TABLE login (
-        "email" varchar(254) NOT NULL UNIQUE,
-        "time" bigint NOT NULL,
-        "token" varchar(100) NOT NULL,
-        "ip" varchar(50) NOT NULL,
-        "preSessionId" varchar(100) NOT NULL,
-        PRIMARY KEY (email)
-    );
-    CREATE TABLE login2 (
-        "firstFactorToken" varchar(100) NOT NULL UNIQUE,
-        "userId" varchar(15) NOT NULL,
-        "time" bigint NOT NULL,
-        "ip" varchar(50) NOT NULL,
-        "webAuthnLoginChallenge" varchar(100),
-        PRIMARY KEY ("firstFactorToken")
-    );
-    CREATE TABLE users (
-        "email" varchar(254) NOT NULL UNIQUE,
-        "userId" varchar(15) NOT NULL UNIQUE,
-        "time" bigint NOT NULL,
-        "totpSecret" varchar(100),
-        "totpActive" boolean DEFAULT false,
-        "webAuthnRegisterChallenge" varchar(100),
-        "webAuthnActive" boolean DEFAULT false,
-        "webAuthnKey" json,
-        PRIMARY KEY ("userId")
-    );
-    CREATE TABLE sessions (
-        "sessionId" varchar(100) NOT NULL UNIQUE,
-        "userId" varchar(15) NOT NULL,
-        "time" bigint NOT NULL,
-        "ip" varchar(50) NOT NULL,
-        PRIMARY KEY ("sessionId")
-    );
-    `
-).catch(() => {});
+// create tables if not present
+db.query(require("./lib/createTables.js"))
+    .then(() => console.log("created tables"))
+    .catch(e => {
+        if (e.code === "42P07") return console.log("tables already exist");
+        return console.log(e);
+    });
 
 // define and handle global variables
 const WEBSCHEMA = process.env.WEB_SCHEMA != undefined ? process.env.WEB_SCHEMA : `https`;

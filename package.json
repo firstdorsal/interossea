@@ -2,7 +2,7 @@
     "name": "interossea",
     "version": "2.0.0",
     "description": "API for login with magic links",
-    "main": "index.mjs",
+    "main": "index.js",
     "scripts": {
         "start": "node index.js",
         "test": "bash test.sh"
@@ -11,8 +11,8 @@
         "type": "git",
         "url": "https://git.y.gy/firstdorsal/interossea.git"
     },
-    "author": "Paul Colin Hennig",
-    "private": true,
+    "author": "Paul Colin Hennig <8d_fvfmaa-o2wf_79aqig6g2ki6-09ffkeqmyo3d@y.gy>",
+    "private": false,
     "devDependencies": {
         "dotenv": "^8.2.0",
         "eslint": "^7.10.0",
@@ -29,8 +29,6 @@
         "express": "^4.17.1",
         "express-rate-limit": "^5.2.3",
         "helmet": "^4.4.1",
-        "mongo-sanitize": "^1.1.0",
-        "monk": "^7.3.2",
         "nodemailer": "^6.4.11",
         "otplib": "^12.0.1",
         "pg": "^8.6.0",
