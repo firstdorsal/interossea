@@ -30,7 +30,9 @@ const db = new pg.Client({
     password: "password",
     database: "db"
 });
-db.connect().catch(e => console.log(e));
+db.connect().catch(() => {
+    console.log("could not connect to database");
+});
 
 // create tables if not present
 import { createTables } from "./lib/createTables.js";
@@ -296,13 +298,14 @@ app.post(`${BASE_URL}/v1/2fa/totp/register`, async (req, res) => {
 });
 
 app.post(`${BASE_URL}/v1/2fa/webauthn/register/request`, async (req, res) => {
-    const user = await checkSession(req);
-    if (!user) return webResponse(res, { message: `invalid session token`, error: true }, true);
-
+    //const user = await checkSession(req);
+    //if (!user) return webResponse(res, { message: `invalid session token`, error: true }, true);
+    const user = { userId: "test" };
     const challengeResponse = generateRegistrationChallenge({
-        relyingParty: { name: process.env.DISPLAY_NAME },
+        relyingParty: { name: process.env.DISPLAY_NAME, id: process.env.WEB_URL },
         user: { id: user.userId, name: user.userId }
     });
+
     db.query(/*sql*/ `UPDATE "users" SET "webAuthnRegisterChallenge"=$2 WHERE "userId"=$1`, [user.userId, challengeResponse.challenge]);
 
     return res.send(challengeResponse);
