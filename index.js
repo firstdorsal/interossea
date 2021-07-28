@@ -13,7 +13,7 @@ import rateLimit from "express-rate-limit";
 import nodemailer from "nodemailer";
 import xss from "xss";
 import qrcode from "qrcode";
-import { generateRegistrationChallenge, parseRegisterRequest, parseLoginRequest, generateLoginChallenge, verifyAuthenticatorAssertion } from "@webauthn/server";
+import { generateRegistrationChallenge, parseRegisterRequest, parseLoginRequest, generateLoginChallenge, verifyAuthenticatorAssertion } from "@firstdorsal/webauthn-server";
 import { authenticator } from "otplib";
 
 const DB_URL = process.env.DB_URL !== undefined ? process.env.DB_URL : `db`;
@@ -22,6 +22,7 @@ const DB_URL = process.env.DB_URL !== undefined ? process.env.DB_URL : `db`;
 import { initPg } from "./lib/initPg.js";
 await initPg(DB_URL);
 
+// connect to the db on the pg server
 import pg from "pg";
 const db = new pg.Client({
     user: "postgres",
@@ -29,11 +30,12 @@ const db = new pg.Client({
     password: "password",
     database: "db"
 });
-db.connect().catch(() => {});
+db.connect().catch(e => console.log(e));
 
 // create tables if not present
 import { createTables } from "./lib/createTables.js";
 await createTables(db);
+
 // define and handle global variables
 const WEBSCHEMA = process.env.WEB_SCHEMA != undefined ? process.env.WEB_SCHEMA : `https`;
 const PORT = process.env.PORT !== undefined ? process.env.PORT : 80;

@@ -1,8 +1,8 @@
 import dotenv from "dotenv";
-dotenv.config({ path: process.cwd() + "/tests/v1/.env" });
-
 import { BASE_URL, app, server, db } from "../../index.js";
 import supertest from "supertest";
+
+dotenv.config({ path: process.cwd() + "/tests/v1/.env" });
 const request = supertest(app);
 const URL = `${BASE_URL}/v1/createsession`;
 
@@ -24,6 +24,7 @@ test("requests to create a session with an invalid login token", async () => {
     expect(JSON.parse(response.text).message).toBe(`Invalid login token`);
 });
 
+// use db to get the token
 test("requests to create a session with the valid token but no preSessionId", async () => {
     await request.post(`${BASE_URL}/v1/login`).send({ email: process.env.RECIPIENT_ADDRESS });
     const dbReponse = await db.query(/*sql*/ `SELECT token FROM "login" WHERE "email"=$1`, [process.env.RECIPIENT_ADDRESS]);
@@ -52,6 +53,19 @@ test("requests to create a session with the valid token and a valid preSessionId
     expect(response.status).toBe(302);
 });
 
+// use actual email to get the token
+/*
+test("requests to create a session with the valid token and a valid preSessionId", async () => {
+    const loginResponse = await request.post(`${BASE_URL}/v1/login`).send({ email: process.env.RECIPIENT_ADDRESS });
+    const loginResponseCookie = loginResponse.header["set-cookie"][0];
+    const preSessionId = loginResponseCookie.substring(13, loginResponseCookie.indexOf(";"));
+
+    const imapResponse = 
+    const token = "";
+    const response = await request.get(`${URL}?t=${token}`).set("Cookie", [`preSessionId=${preSessionId}`]);
+    expect(response.status).toBe(302);
+});
+*/
 afterAll(async () => {
     await server.close();
 });
