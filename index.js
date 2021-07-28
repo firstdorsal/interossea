@@ -306,7 +306,8 @@ app.post(`${BASE_URL}/v1/2fa/webauthn/register/request`, async (req, res) => {
         user: { id: user.userId, name: user.userId }
     });
 
-    db.query(/*sql*/ `UPDATE "users" SET "webAuthnRegisterChallenge"=$2 WHERE "userId"=$1`, [user.userId, challengeResponse.challenge]);
+    const query = await db.query(/*sql*/ `UPDATE "users" SET "webAuthnRegisterChallenge"=$2 WHERE "userId"=$1`, [user.userId, challengeResponse.challenge]);
+    console.log(query);
 
     return res.send(challengeResponse);
 });
@@ -316,7 +317,7 @@ app.post(`${BASE_URL}/v1/2fa/webauthn/register/verify`, async (req, res) => {
     if (!user) return webResponse(res, { message: `invalid session token`, error: true }, true);
 
     const { key, challenge } = parseRegisterRequest(req.body.credentials);
-    if (DEBUG) console.log(key, challenge, req.body, req);
+    if (DEBUG) console.log(key, challenge, req.body);
 
     if (challenge === user.webAuthnRegisterChallenge) {
         db.query(/*sql*/ `UPDATE "users" SET "webAuthnKey"=$2, "webAuthnRegisterChallenge"=null, "webAuthnActive"=true WHERE "userId"=$1`, [user.userId, key]);
