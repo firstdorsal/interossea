@@ -2,6 +2,7 @@
     "name": "interossea",
     "version": "2.0.0",
     "description": "API for login with magic links",
+    "type": "module",
     "main": "index.js",
     "scripts": {
         "start": "node index.js",

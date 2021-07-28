@@ -1,6 +1,5 @@
-process.env.DB_URL = "localhost";
-process.env.DEBUG = true;
-process.env.PORT = 3000;
+require(`dotenv`).config();
+
 const { BASE_URL, app, server } = require("../../index.js");
 const supertest = require("supertest");
 const request = supertest(app);
@@ -27,6 +26,7 @@ test("requests a login mail with an invalid email", async () => {
 test("requests a login mail with a valid email", async () => {
     const response = await request.post(URL).send({ email: "test@y.gy" });
 
+    console.log(process.env.RECIPIENT_ADDRESS);
     expect(response.status).toBe(200);
     expect(JSON.parse(response.text).message).toBe(`Success`);
 });

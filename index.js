@@ -1,28 +1,30 @@
 `use strict`;
 
 const emailRegex = /^(([^<>()\[\]\\.,;:\s@`]{1,64}(\.[^<>()\[\]\\.,;:\s@`]+)*)|(`.{1,62}`))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]{1,63}\.)+[a-zA-Z]{2,63}))$/;
-require(`dotenv`).config();
-const express = require(`express`);
-const cookieParser = require(`cookie-parser`);
-const compression = require(`compression`);
-const bodyParser = require(`body-parser`);
-const cryptoRandomString = require(`crypto-random-string`);
-const helmet = require(`helmet`);
-const rateLimit = require(`express-rate-limit`);
-const path = require(`path`);
-const nodemailer = require(`nodemailer`);
-const xss = require(`xss`);
-const qrcode = require(`qrcode`);
-const { generateRegistrationChallenge, parseRegisterRequest, parseLoginRequest, generateLoginChallenge, verifyAuthenticatorAssertion } = require(`@webauthn/server`);
-const { authenticator } = require(`otplib`);
+import dotenv from "dotenv";
+dotenv.config();
+import express from "express";
+import cookieParser from "cookie-parser";
+import compression from "compression";
+import bodyParser from "body-parser";
+import cryptoRandomString from "crypto-random-string";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import path from "path";
+import nodemailer from "nodemailer";
+import xss from "xss";
+import qrcode from "qrcode";
+import { generateRegistrationChallenge, parseRegisterRequest, parseLoginRequest, generateLoginChallenge, verifyAuthenticatorAssertion } from "@webauthn/server";
+import { authenticator } from "otplib";
 
 const DB_URL = process.env.DB_URL !== undefined ? process.env.DB_URL : `db`;
 
 // init db: create the database on the pg server
-require("./lib/initPg")(DB_URL);
-const { Client } = require(`pg`);
+import { initPg } from "./lib/initPg.js";
+await initPg(DB_URL);
 
-const db = new Client({
+import pg from "pg";
+const db = new pg.Client({
     user: "postgres",
     host: DB_URL,
     password: "password",
@@ -31,13 +33,8 @@ const db = new Client({
 db.connect().catch(() => {});
 
 // create tables if not present
-db.query(require("./lib/createTables.js"))
-    .then(() => console.log("created tables"))
-    .catch(e => {
-        if (e.code === "42P07") return console.log("tables already exist");
-        return console.log(e);
-    });
-
+import { createTables } from "./lib/createTables.js";
+createTables(db);
 // define and handle global variables
 const WEBSCHEMA = process.env.WEB_SCHEMA != undefined ? process.env.WEB_SCHEMA : `https`;
 const PORT = process.env.PORT !== undefined ? process.env.PORT : 80;
@@ -67,10 +64,10 @@ app.use(compression());
 app.use(bodyParser.json({ limit: `10kb` }));
 app.use(helmet.hidePoweredBy());
 app.disable(`etag`);
-app.use(BASE_URL, express.static(`${__dirname}/public`));
+app.use(BASE_URL, express.static(`public`));
 app.set(`view engine`, `pug`);
 app.set("trust proxy", true);
-app.locals.basedir = path.join(__dirname, `views`);
+app.locals.basedir = `views`;
 
 // apply rate limiting to login
 app.use(
@@ -470,4 +467,4 @@ const webResponse = (res, responseObject, overrideDebug = false) => {
     }
     return res.type("application/json").status(400).send({ message: `Error`, error: true });
 };
-module.exports = { app, BASE_URL, server };
+export { app, BASE_URL, server };
