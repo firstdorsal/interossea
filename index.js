@@ -298,16 +298,13 @@ app.post(`${BASE_URL}/v1/2fa/totp/register`, async (req, res) => {
 });
 
 app.post(`${BASE_URL}/v1/2fa/webauthn/register/request`, async (req, res) => {
-    //const user = await checkSession(req);
-    //if (!user) return webResponse(res, { message: `invalid session token`, error: true }, true);
-    const user = { userId: "test" };
+    const user = await checkSession(req);
+    if (!user) return webResponse(res, { message: `invalid session token`, error: true }, true);
     const challengeResponse = generateRegistrationChallenge({
         relyingParty: { name: process.env.DISPLAY_NAME, id: process.env.WEB_URL },
         user: { id: user.userId, name: user.userId }
     });
-
-    const query = await db.query(/*sql*/ `UPDATE "users" SET "webAuthnRegisterChallenge"=$2 WHERE "userId"=$1`, [user.userId, challengeResponse.challenge]);
-    console.log(query);
+    await db.query(/*sql*/ `UPDATE "users" SET "webAuthnRegisterChallenge"=$2 WHERE "userId"=$1`, [user.userId, challengeResponse.challenge]);
 
     return res.send(challengeResponse);
 });
