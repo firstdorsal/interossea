@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
-dotenv.config();
+dotenv.config({ path: process.cwd() + "/tests/v1/.env" });
+
 import { BASE_URL, app, server } from "../../index.js";
 import supertest from "supertest";
 const request = supertest(app);
@@ -24,19 +25,17 @@ test("requests a login mail with an invalid email", async () => {
 });
 
 test("requests a login mail with a valid email", async () => {
-    const response = await request.post(URL).send({ email: "test@y.gy" });
-
-    console.log(process.env.RECIPIENT_ADDRESS);
+    const response = await request.post(URL).send({ email: process.env.RECIPIENT_ADDRESS });
     expect(response.status).toBe(200);
     expect(JSON.parse(response.text).message).toBe(`Success`);
 });
 
 test("requests a second login in mail", async () => {
-    const response = await request.post(URL).send({ email: "test@y.gy" });
+    const response = await request.post(URL).send({ email: process.env.RECIPIENT_ADDRESS });
     expect(response.status).toBe(400);
     expect(JSON.parse(response.text).message).toContain(`Please wait another`);
 });
 
-afterAll(() => {
-    server.close();
+afterAll(async () => {
+    await server.close();
 });

@@ -33,7 +33,7 @@ db.connect().catch(() => {});
 
 // create tables if not present
 import { createTables } from "./lib/createTables.js";
-createTables(db);
+await createTables(db);
 // define and handle global variables
 const WEBSCHEMA = process.env.WEB_SCHEMA != undefined ? process.env.WEB_SCHEMA : `https`;
 const PORT = process.env.PORT !== undefined ? process.env.PORT : 80;
@@ -128,7 +128,7 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
 
     // check if last request was sent from same browser
     if (!login.preSessionId || login.preSessionId !== req.cookies.preSessionId) {
-        return webResponse(res, { message: `invalid preSessionId cookie: Request was sent from a different origin/browser`, error: true }, true);
+        return webResponse(res, { message: `invalid preSessionId cookie: Request was sent from a different origin/browser?`, error: true }, true);
     }
 
     // try to find user with email
@@ -466,4 +466,4 @@ const webResponse = (res, responseObject, overrideDebug = false) => {
     }
     return res.type("application/json").status(400).send({ message: `Error`, error: true });
 };
-export { app, BASE_URL, server };
+export { app, BASE_URL, server, db };
