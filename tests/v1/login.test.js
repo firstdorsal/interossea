@@ -1,7 +1,7 @@
-require(`dotenv`).config();
-
-const { BASE_URL, app, server } = require("../../index.js");
-const supertest = require("supertest");
+import dotenv from "dotenv";
+dotenv.config();
+import { BASE_URL, app, server } from "../../index.js";
+import supertest from "supertest";
 const request = supertest(app);
 const URL = `${BASE_URL}/v1/login`;
 

@@ -10,7 +10,6 @@ import bodyParser from "body-parser";
 import cryptoRandomString from "crypto-random-string";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
-import path from "path";
 import nodemailer from "nodemailer";
 import xss from "xss";
 import qrcode from "qrcode";
