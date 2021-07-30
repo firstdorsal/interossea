@@ -302,8 +302,7 @@ app.post(`${BASE_URL}/v1/2fa/webauthn/register/request`, async (req, res) => {
     if (!user) return webResponse(res, { message: `invalid session token`, error: true }, true);
     const challengeResponse = generateRegistrationChallenge({
         relyingParty: { name: process.env.DISPLAY_NAME, id: process.env.WEB_URL },
-        user: { id: user.userId, name: user.userId },
-        attestation: "indirect"
+        user: { id: user.userId, name: user.userId }
     });
     await db.query(/*sql*/ `UPDATE "users" SET "webAuthnRegisterChallenge"=$2 WHERE "userId"=$1`, [user.userId, challengeResponse.challenge]);
 
@@ -318,7 +317,7 @@ app.post(`${BASE_URL}/v1/2fa/webauthn/register/verify`, async (req, res) => {
     if (DEBUG) console.log(prr, "\n_______\n", req.body);
 
     if (prr.key && prr.challenge === user.webAuthnRegisterChallenge) {
-        db.query(/*sql*/ `UPDATE "users" SET "webAuthnKey"=$2, "webAuthnRegisterChallenge"=null, "webAuthnActive"=true WHERE "userId"=$1`, [user.userId, key]);
+        db.query(/*sql*/ `UPDATE "users" SET "webAuthnKey"=$2, "webAuthnRegisterChallenge"=null, "webAuthnActive"=true WHERE "userId"=$1`, [user.userId, prr.key]);
         return webResponse(res, { message: `Success`, error: false }, true);
     }
     return webResponse(res, { message: `WebAuthn challenge failed`, error: true }, true);
