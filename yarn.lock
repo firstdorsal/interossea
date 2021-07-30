@@ -1859,7 +1859,7 @@ has@^1.0.3:
   dependencies:
     function-bind "^1.1.1"
 
-helmet@^4.4.1:
+helmet@^4.6.0:
   version "4.6.0"
   resolved "https://registry.yarnpkg.com/helmet/-/helmet-4.6.0.tgz#579971196ba93c5978eb019e4e8ec0e50076b4df"
   integrity sha512-HVqALKZlR95ROkrnesdhbbZJFi/rIVSoNq6f3jA/9u6MIbTsPh3xZwihjeI5+DO/2sOV6HMHooXcEOuwskHpTg==
@@ -1975,6 +1975,14 @@ inherits@2.0.3:
   version "2.0.3"
   resolved "https://registry.yarnpkg.com/inherits/-/inherits-2.0.3.tgz#633c2c83e3da42a502f52466022480f4208261de"
   integrity sha1-Yzwsg+PaQqUC9SRmAiSA9CCCYd4=
+
+integralhelm@^1.2.2:
+  version "1.2.2"
+  resolved "https://registry.yarnpkg.com/integralhelm/-/integralhelm-1.2.2.tgz#24a46337f7412175268dd63ac0ff93827a45e7a4"
+  integrity sha512-pVR4D6WZO9Qt5aJ/4HtAylvPBZNV77WoQkR3Sav7ajH8vFFDcCSRcLAKc6bDYSOHcG2K2+0bGjXGd1y670peoA==
+  dependencies:
+    helmet "^4.6.0"
+    permissions-policy "^0.6.0"
 
 ipaddr.js@1.9.1:
   version "1.9.1"
@@ -2981,6 +2989,11 @@ path-to-regexp@0.1.7:
   version "0.1.7"
   resolved "https://registry.yarnpkg.com/path-to-regexp/-/path-to-regexp-0.1.7.tgz#df604178005f522f15eb4490e7247a1bfaa67f8c"
   integrity sha1-32BBeABfUi8V60SQ5yR6G/qmf4w=
+
+permissions-policy@^0.6.0:
+  version "0.6.0"
+  resolved "https://registry.yarnpkg.com/permissions-policy/-/permissions-policy-0.6.0.tgz#9c01b1a8e360ab4955e20a7946abcb0fd34d276d"
+  integrity sha512-VfN72swhRiuvfejFP/N5hOVCyriBgzy1KiLE8mjN2KkCJCOtFv2N221SVUHYl0OPXIOoqu7tkc7efreiN7encA==
 
 pg-connection-string@^2.5.0:
   version "2.5.0"

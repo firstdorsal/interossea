@@ -8,7 +8,7 @@ import cookieParser from "cookie-parser";
 import compression from "compression";
 import bodyParser from "body-parser";
 import cryptoRandomString from "crypto-random-string";
-import helmet from "helmet";
+import integralhelm from "integralhelm";
 import rateLimit from "express-rate-limit";
 import nodemailer from "nodemailer";
 import xss from "xss";
@@ -57,18 +57,16 @@ const IP_REQUEST_TIME_MINUTES = process.env.IP_REQUEST_TIME_MINUTES !== undefine
 
 const IP_REQUEST_PER_TIME = process.env.IP_REQUEST_PER_TIME !== undefined ? process.env.IP_REQUEST_PER_TIME : 100;
 
-const DISABLE_FRONTEND = process.env.DISABLE_FRONTEND !== undefined ? process.env.DISABLE_FRONTEND : true;
+const ENABLE_FRONTEND = process.env.ENABLE_FRONTEND !== undefined ? process.env.ENABLE_FRONTEND : false;
 
 // create express and set settings
 const app = express();
 const server = app.listen(PORT);
 app.use(cookieParser());
 app.use(compression());
+app.use(integralhelm({ helmet: { csp: { "font-src": ["'self'"], "style-src": ["'self'"], "img-src": ["'self'"], "script-src": ["'self'"], "connect-src": ["'self'"] } } }));
 app.use(bodyParser.json({ limit: `10kb` }));
-app.use(helmet.hidePoweredBy());
-app.disable(`etag`);
 app.use(BASE_URL, express.static(`public`));
-app.set(`view engine`, `pug`);
 app.set("trust proxy", true);
 app.locals.basedir = `views`;
 
@@ -85,10 +83,13 @@ app.use(
 app.get(`${BASE_URL}/`, (req, res) => {
     res.render(`index`);
 });
-if (!DISABLE_FRONTEND) {
+if (ENABLE_FRONTEND) {
+    app.set(`view engine`, `pug`);
     app.get(`${BASE_URL}/login`, (req, res) => {
         res.render(`login/index`);
     });
+} else {
+    console.log("frontend is disabled");
 }
 
 // handle clicked link
@@ -419,7 +420,7 @@ app.post(`${BASE_URL}/v1/logout`, async (req, res) => {
         maxAge: 1,
         ...SECURE_COOKIE_ATTRIBUTES
     });
-    return res.sendStatus(200);
+    return webResponse(res, { message: `success`, error: false }, true);
 });
 
 app.post(`${BASE_URL}/v1/delete-account`, async (req, res) => {
@@ -435,7 +436,12 @@ app.post(`${BASE_URL}/v1/delete-account`, async (req, res) => {
         ...SECURE_COOKIE_ATTRIBUTES
     });
     await db.query(`DELETE FROM "users" WHERE "userId"=$1`, [user.userId]);
-    return res.sendStatus(200);
+    return webResponse(res, { message: `success`, error: false }, true);
+});
+
+app.post(`${BASE_URL}/v1/rml`, async (req, res) => {
+    // a form of remote login to easily authorize yourself on a tv or any other device without email
+    return webResponse(res, { message: `not implemented`, error: true }, true);
 });
 
 app.get(`*`, (req, res) => {
