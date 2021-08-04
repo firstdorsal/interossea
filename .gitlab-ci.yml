@@ -21,6 +21,7 @@ mirror:
     - USERNAME=firstdorsal
     - git config --global user.email "runner@$CI_SERVER_HOST"
     - git config --global user.name "runner"
+    - git fetch --unshallow origin
     - git remote remove origin
     - git remote add origin https://${USERNAME}:$GITHUB_TOKEN@github.com/$CI_PROJECT_PATH.git
     - echo " " >> .gitlab-ci.yml
