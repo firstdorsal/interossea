@@ -5,10 +5,12 @@
     "type": "module",
     "main": "index.js",
     "scripts": {
-        "start": "node index.js",
+        "start": "node dist/index.js",
+        "build": "tsc",
+        "dev": "tsc-watch --watch --onSuccess 'docker restart interossea'",
         "test": "bash scripts/test.sh",
-        "start-db": "bash ./scripts/start-db.sh",
-        "stop-db": "bash ./scripts/start-db.sh"
+        "start-docker-builded": "bash ./scripts/start-docker-builded.sh",
+        "start-docker-mounted": "bash ./scripts/start-docker-mounted.sh"
     },
     "repository": {
         "type": "git",
@@ -17,14 +19,23 @@
     "author": "Paul Colin Hennig <8d_fvfmaa-o2wf_79aqig6g2ki6-09ffkeqmyo3d@y.gy>",
     "private": false,
     "devDependencies": {
+        "@types/node": "^16.10.9",
         "dotenv": "^8.2.0",
         "eslint": "^7.10.0",
         "jest": "^27.0.6",
-        "supertest": "^6.1.3"
+        "supertest": "^6.1.3",
+        "tsc-watch": "^4.5.0"
     },
     "dependencies": {
         "@firstdorsal/webauthn-server": "^0.1.6",
         "@fontsource/inter": "^4.3.0",
+        "@types/compression": "^1.7.2",
+        "@types/cookie-parser": "^1.4.2",
+        "@types/express": "^4.17.13",
+        "@types/express-rate-limit": "^5.1.3",
+        "@types/nodemailer": "^6.4.4",
+        "@types/pg": "^8.6.1",
+        "@types/qrcode": "^1.4.1",
         "body-parser": "^1.19.0",
         "compression": "^1.7.4",
         "cookie-parser": "^1.4.5",
@@ -38,6 +49,7 @@
         "pug": "^3.0.2",
         "qrcode": "^1.4.4",
         "randomstring": "^1.1.5",
+        "typescript": "^4.4.4",
         "xss": "^1.0.8"
     }
 }

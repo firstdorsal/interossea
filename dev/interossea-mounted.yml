@@ -1,0 +1,33 @@
+version: "3.7"
+
+services:
+    interossea:
+        image: node:lts-alpine3.13
+        container_name: interossea
+        restart: always
+        ports:
+            - 127.0.0.1:3000:$PORT
+        environment:
+            - LOGIN_MAIL_USERNAME=$LOGIN_MAIL_USERNAME
+            - LOGIN_MAIL_PASSWORD=$LOGIN_MAIL_PASSWORD
+            - DISPLAY_NAME=$DISPLAY_NAME
+            - FROM_NAME=$FROM_NAME
+            - FROM_MAIL_ADDRESS=$FROM_MAIL_ADDRESS
+            - MAIL_HOST=$MAIL_HOST
+            - REPLY_TO=$REPLY_TO
+            - MAIL_AGENT=$MAIL_AGENT
+            - WEB_SCHEMA=$WEB_SCHEMA
+            - WEB_URL=$WEB_URL
+            - DB_URL=$DB_URL
+            - PORT=$PORT
+            - DEBUG=$DEBUG
+            - ENABLE_FRONTEND=$ENABLE_FRONTEND
+        networks:
+            - db
+        command: yarn start
+        working_dir: /interossea/
+        volumes:
+            - ../:/interossea/
+networks:
+    db:
+        name: interossea-db

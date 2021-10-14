@@ -34,10 +34,10 @@ CREATE TABLE sessions (
     PRIMARY KEY ("sessionId")
 );
 `;
-
-export const createTables = async db => {
+export const createTables = async (db) => {
     await db.query(query).catch(e => {
-        if (e.code === "42P07") return console.log("tables already exist");
+        if (e.code === "42P07")
+            return console.log("tables already exist");
         return console.log(e);
     });
     console.log("created tables");

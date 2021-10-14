@@ -1,6 +1,6 @@
 import pg from "pg";
 
-export const initPg = async DB_URL => {
+export const initPg = async (DB_URL: string) => {
     try {
         const client = new pg.Client({
             user: "postgres",
