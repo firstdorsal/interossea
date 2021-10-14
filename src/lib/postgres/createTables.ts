@@ -2,7 +2,7 @@ const query = /*sql*/ `
 CREATE TABLE login (
     "email" varchar(254) NOT NULL UNIQUE,
     "time" bigint NOT NULL,
-    "token" varchar(100) NOT NULL,
+    "emailToken" varchar(100) NOT NULL,
     "ip" varchar(50) NOT NULL,
     "preSessionId" varchar(100) NOT NULL,
     PRIMARY KEY (email)

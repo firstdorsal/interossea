@@ -203,7 +203,7 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
     } else if (user.totpActive || user.webAuthnActive) {
         // check if 2fa is present
 
-        const firstFactorToken: t.FirstFactorToken = `fft${generateToken(100)}`;
+        const firstFactorToken: t.FirstFactorToken = `fft${generateToken(97)}`;
 
         // add firstFactorToken to db
         await db.addFirstFactorToken(firstFactorToken, user.userId, login.ip);
@@ -221,7 +221,7 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
         return res.redirect(`${ENABLE_FRONTEND ? BASE_URL : ""}/login/2fa/webauthn`);
     }
     // generate session id
-    const newSessionID: t.SessionID = `sid${generateToken(100)}`;
+    const newSessionID: t.SessionID = `sid${generateToken(97)}`;
 
     // save session cookie to db
     await db.saveSessionID(newSessionID, user.userId, login.ip);
@@ -256,8 +256,8 @@ app.post(`${BASE_URL}/v1/login`, async (req, res) => {
     const email = xss(req.body.email);
     const login = await db.getLoginByEmail(email);
 
-    const token: t.EmailToken = `emt${generateToken(100)}`;
-    const preSessionId: t.PreSessionID = `psid${generateToken(100)}`;
+    const token: t.EmailToken = `emt${generateToken(97)}`;
+    const preSessionId: t.PreSessionID = `psid${generateToken(96)}`;
     const link = `${WEBSCHEMA}://${WEB_URL}${BASE_URL}/v1/createsession?t=${token}`;
     const ip = req.ip;
     if (login) {
@@ -415,7 +415,7 @@ app.post(`${BASE_URL}/v1/2fa/createsession/totp`, async (req, res) => {
     if (!user) return webResponse(res, { message: `invalid user`, type: "error" });
     if (authenticator.generate(user.totpSecret) === req.body.totp) {
         // generate session id
-        const newSessionID: t.SessionID = `sid${generateToken(100)}`;
+        const newSessionID: t.SessionID = `sid${generateToken(97)}`;
 
         // save session cookie to db
         await db.saveSessionID(newSessionID, user.userId, req.ip);
@@ -483,7 +483,7 @@ app.post(`${BASE_URL}/v1/2fa/createsession/webauthn/verify`, async (req, res) =>
     // solvedChallenge === login.webAuthnLoginChallenge
     if (verifyAuthenticatorAssertion(req.body.credentials, user.webAuthnKey)) {
         // generate session id
-        const newSessionID: t.SessionID = `sid${generateToken(100)}`;
+        const newSessionID: t.SessionID = `sid${generateToken(97)}`;
 
         // save session cookie to db
         await db.saveSessionID(newSessionID, user.userId, req.ip);

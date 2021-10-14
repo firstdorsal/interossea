@@ -41,13 +41,14 @@ export class DataBase {
     };
     getLogin = async (token: string): Promise<t.Login | undefined> => {
         if (this.type === "pg") {
-            return (await this.db.query(/*sql*/ `SELECT * FROM "login" WHERE "token"=$1`, [token]))
-                .rows[0];
+            return (
+                await this.db.query(/*sql*/ `SELECT * FROM "login" WHERE "emailToken"=$1`, [token])
+            ).rows[0];
         }
     };
     deleteLogin = async (token: string) => {
         if (this.type === "pg") {
-            return this.db.query(/*sql*/ `DELETE FROM "login" WHERE "token"=$1`, [token]);
+            return this.db.query(/*sql*/ `DELETE FROM "login" WHERE "emailToken"=$1`, [token]);
         }
     };
     getUserByEmail = async (email: t.Email): Promise<t.User | false> => {
@@ -101,7 +102,7 @@ export class DataBase {
     ) => {
         if (this.type === "pg") {
             return this.db.query(
-                /*sql*/ `INSERT INTO "login" ("email", "time", "token", "ip", "preSessionId") VALUES ($1,$2,$3,$4,$5)`,
+                /*sql*/ `INSERT INTO "login" ("email", "time", "emailToken", "ip", "preSessionId") VALUES ($1,$2,$3,$4,$5)`,
                 [email, Date.now(), emailToken, ip, preSessionId]
             );
         }
