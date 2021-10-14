@@ -36,3 +36,4 @@ mirror:
     - curl --request POST "https://gitlab.com/api/v4/projects?visibility=public&private_token=$GITLAB_TOKEN&name=$CI_PROJECT_NAME" ; echo
     - curl --request DELETE "https://gitlab.com/api/v4/projects/$CI_PROJECT_NAMESPACE%2F$CI_PROJECT_NAME/protected_branches/master?private_token=$GITLAB_TOKEN" ; echo
     - git push --set-upstream origin HEAD:refs/heads/master -f
+ 
