@@ -147,10 +147,10 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
     const token = xss(req.query.t.toString());
 
     // find corresponding email for token t
-    const login = await db.getEmailForToken(token);
+    const login = await db.getLogin(token);
 
     // delete login
-    await db.deleteLoginForToken(token);
+    await db.deleteLogin(token);
 
     // check if token exists and hasnt expired
     const ip = req.ip;
@@ -192,7 +192,7 @@ app.get(`${BASE_URL}/v1/createsession`, async (req, res) => {
     }
 
     // try to find user with email
-    let user = await db.getUserForEmail(login.email);
+    let user = await db.getUserByEmail(login.email);
 
     // create new user if dont exist
     if (!user) {
@@ -254,7 +254,7 @@ app.post(`${BASE_URL}/v1/login`, async (req, res) => {
         return webResponse(res, { message: `invalid mail`, type: "error" });
     }
     const email = xss(req.body.email);
-    const login = await db.getLoginForEmail(email);
+    const login = await db.getLoginByEmail(email);
 
     const token: t.EmailToken = `emt${generateToken(100)}`;
     const preSessionId: t.PreSessionID = `psid${generateToken(100)}`;
@@ -406,12 +406,12 @@ app.post(`${BASE_URL}/v1/2fa/createsession/totp`, async (req, res) => {
     if (!req.body.totp)
         return webResponse(res, { message: `missing totp object in body`, type: "error" });
 
-    const login = await db.getAdvancedLoginForFFT(req.cookies.firstFactorToken);
+    const login = await db.getAdvancedLogin(req.cookies.firstFactorToken);
 
     if (!login || !login.userId)
         return webResponse(res, { message: `invalid firstFactorToken`, type: "error" });
 
-    const user = await db.getUserForUserId(login.userId);
+    const user = await db.getUserByUserId(login.userId);
     if (!user) return webResponse(res, { message: `invalid user`, type: "error" });
     if (authenticator.generate(user.totpSecret) === req.body.totp) {
         // generate session id
@@ -440,12 +440,12 @@ app.post(`${BASE_URL}/v1/2fa/createsession/webauthn/request`, async (req, res) =
     if (!req.cookies) return webResponse(res, { message: `missing cookies`, type: "error" });
     if (!req.cookies.firstFactorToken)
         return webResponse(res, { message: `missing firstFactorToken cookie`, type: "error" });
-    const login = await db.getAdvancedLoginForFFT(req.cookies.firstFactorToken);
+    const login = await db.getAdvancedLogin(req.cookies.firstFactorToken);
 
     if (!login || !login.userId)
         return webResponse(res, { message: `invalid firstFactorToken`, type: "error" });
 
-    const user = await db.getUserForUserId(login.userId);
+    const user = await db.getUserByUserId(login.userId);
 
     if (!user) return webResponse(res, { message: `user not found`, type: "error" });
     if (!user.webAuthnKey)
@@ -463,11 +463,11 @@ app.post(`${BASE_URL}/v1/2fa/createsession/webauthn/verify`, async (req, res) =>
     if (!req.cookies.firstFactorToken)
         return webResponse(res, { message: `missing firstFactorToken cookie`, type: "error" });
     if (!req.body) return webResponse(res, { message: `missing body`, type: "error" });
-    const login = await db.getAdvancedLoginForFFT(req.cookies.firstFactorToken);
+    const login = await db.getAdvancedLogin(req.cookies.firstFactorToken);
 
     if (!login || !login.userId)
         return webResponse(res, { message: `invalid firstFactorToken`, type: "error" });
-    const user = await db.getUserForUserId(login.userId);
+    const user = await db.getUserByUserId(login.userId);
 
     if (!user) return webResponse(res, { message: `user not found`, type: "error" });
     if (!user.webAuthnKey)
@@ -549,7 +549,7 @@ const checkSession = async (req: Request) => {
     const session = await db.getSession(req.cookies.sessionId);
     if (!session) return false;
 
-    const user = db.getUserForUserId(session.userId);
+    const user = db.getUserByUserId(session.userId);
     if (!user) return false;
     return user;
 };
@@ -572,4 +572,5 @@ const webResponse = (res: Response, responseObject: t.WebResponse, overrideDebug
     }
     return res.type("application/json").status(400).send({ message: `Error`, error: true });
 };
+
 export { app, BASE_URL, server, db };

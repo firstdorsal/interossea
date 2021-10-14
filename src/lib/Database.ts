@@ -39,18 +39,18 @@ export class DataBase {
             await createTables(this.db);
         }
     };
-    getEmailForToken = async (token: string): Promise<t.Login | undefined> => {
+    getLogin = async (token: string): Promise<t.Login | undefined> => {
         if (this.type === "pg") {
             return (await this.db.query(/*sql*/ `SELECT * FROM "login" WHERE "token"=$1`, [token]))
                 .rows[0];
         }
     };
-    deleteLoginForToken = async (token: string) => {
+    deleteLogin = async (token: string) => {
         if (this.type === "pg") {
             return this.db.query(/*sql*/ `DELETE FROM "login" WHERE "token"=$1`, [token]);
         }
     };
-    getUserForEmail = async (email: t.Email): Promise<t.User | false> => {
+    getUserByEmail = async (email: t.Email): Promise<t.User | false> => {
         if (this.type === "pg") {
             return (await this.db.query(/*sql*/ `SELECT * FROM "users" WHERE "email"=$1`, [email]))
                 .rows[0];
@@ -85,7 +85,7 @@ export class DataBase {
             );
         }
     };
-    getLoginForEmail = async (email: t.Email): Promise<t.Login | false> => {
+    getLoginByEmail = async (email: t.Email): Promise<t.Login | false> => {
         if (this.type === "pg") {
             return (await this.db.query(/*sql*/ `SELECT * FROM "login" WHERE "email"=$1`, [email]))
                 .rows[0];
@@ -151,7 +151,7 @@ export class DataBase {
             );
         }
     };
-    getUserForUserId = async (userId: t.UserID): Promise<t.User | false> => {
+    getUserByUserId = async (userId: t.UserID): Promise<t.User | false> => {
         if (this.type === "pg") {
             return (
                 await this.db.query(/*sql*/ `SELECT * FROM "users" WHERE "userId"=$1`, [userId])
@@ -159,9 +159,7 @@ export class DataBase {
         }
         return false;
     };
-    getAdvancedLoginForFFT = async (
-        firstFactorToken: t.FirstFactorToken
-    ): Promise<t.Login | false> => {
+    getAdvancedLogin = async (firstFactorToken: t.FirstFactorToken): Promise<t.Login | false> => {
         if (this.type === "pg") {
             return (
                 await this.db.query(/*sql*/ `SELECT * FROM "login2" WHERE "firstFactorToken"=$1`, [
@@ -192,7 +190,7 @@ export class DataBase {
     };
     deleteUser = async (userId: t.UserID) => {
         if (this.type === "pg") {
-            return this.db.query(`DELETE FROM "users" WHERE "userId"=$1`, [userId]);
+            return this.db.query(/*sql*/ `DELETE FROM "users" WHERE "userId"=$1`, [userId]);
         }
     };
 

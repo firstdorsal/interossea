@@ -24,6 +24,7 @@ export interface Login {
     ip: IP;
     email: Email;
     preSessionId: PreSessionID;
+    token: EmailToken;
     userId?: UserID;
     firstFactorToken: FirstFactorToken;
     webAuthnLoginChallenge: WebAuthnChallenge;
